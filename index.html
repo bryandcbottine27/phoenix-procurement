@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<!--
+  Phoenix Procurement — MODULAR build (Stage 1 refactor)
+  Source modules live in /src and /styles. This index.html loads them in order.
+  NOTE: ES modules require a local web server (see /docs/PHOENIX_DEVELOPER_NOTES.md).
+  A double-clickable single-file build is generated at /dist/phoenix-procurement-DEMO.html
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Phoenix Procurement — Phoenix Beverages Limited</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+
+<!-- ============================================================
+     LOGIN / DEMO SETUP SCREEN
+     ============================================================ -->
+<div id="login-screen" class="hidden">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark">P</div>
+      <h1>Welcome</h1>
+      <div class="subtitle">Phoenix Beverages Limited — Procurement Operations</div>
+    </div>
+    <form class="login-form" id="setup-form">
+      <p id="login-intro" style="text-align: center; font-size: 13px; color: var(--muted); margin-bottom: 20px;">
+        First time on this browser? Tell us who you are.<br>
+        You'll only see this once.
+      </p>
+      <div class="login-error" id="setup-error"></div>
+      <div id="password-login-fields" class="hidden">
+        <div class="field">
+          <label>Username / Email</label>
+          <input type="text" id="login-email" autocomplete="username" placeholder="e.g. bryan.bottine@company.com" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="login-password" autocomplete="current-password" placeholder="Your password" />
+        </div>
+      </div>
+      <div id="demo-profile-fields">
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="setup-name" placeholder="e.g. Bryan Bottine" />
+      </div>
+      <div class="field">
+        <label>Your 2-Letter Code</label>
+        <input type="text" id="setup-code" maxlength="3" placeholder="e.g. BB" style="text-transform: uppercase; letter-spacing: 0.1em;" />
+        <div style="font-size: 11px; color: var(--muted-soft); margin-top: 4px;">
+          The code shown next to your name in orders. Existing codes: BB, VS, YA, SC, SL, EL, ET, SJ.
+        </div>
+      </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%; padding: 11px; justify-content: center;" id="setup-btn">
+        Continue
+      </button>
+      <div class="footnote">
+        <span id="login-footnote-text">Your choice is saved on this device. Questions? Contact <strong>Bryan Bottine</strong>.</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================
+     APP SHELL
+     ============================================================ -->
+<div id="app">
+
+  <div class="test-mode-banner" id="test-mode-banner">
+    <span>⚠ TEST MODE — prototype data only</span>
+    <button onclick="document.getElementById('test-mode-banner').style.display='none'" title="Dismiss for this session">✕</button>
+  </div>
+
+  <header class="app-header">
+    <div class="brand">
+      <div class="mark">P</div>
+      <div class="name">Phoenix Procurement<span>Phoenix Beverages Ltd</span></div>
+    </div>
+    <div class="breadcrumb" id="breadcrumb">
+      <span class="current">Dashboard</span>
+    </div>
+    <div class="right">
+      <span class="sync-status sync-ok" id="sync-status" title="">✓ Synced</span>
+      <button class="btn btn-sm" id="quick-new-order">+ New Order</button>
+      <div class="user-chip" id="user-chip" title="User menu">
+        <div class="avatar" id="user-avatar">BB</div>
+        <span id="user-name">Loading…</span>
+        <span class="role" id="user-role">—</span>
+        <span class="chip-caret">⌄</span>
+      </div>
+    </div>
+  </header>
+
+  <aside class="app-sidebar">
+
+    <div class="entity-switcher" id="entity-switcher">
+      <div class="entity-switcher-label">Entity</div>
+      <div class="entity-tabs" id="entity-tabs"></div>
+    </div>
+
+    <!-- 1. Workbench: daily entry points -->
+    <div class="nav-section">
+      <div class="nav-section-title">Workbench</div>
+      <div class="nav-item active" data-view="dashboard">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" data-view="mywork">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        <span>My Work</span>
+        <span class="count" id="count-mywork">—</span>
+      </div>
+      <div class="nav-item" data-view="teamwork">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Team Work</span>
+        <span class="count" id="count-teamwork">—</span>
+      </div>
+    </div>
+
+    <!-- 2. Foreign order control -->
+    <div class="nav-section">
+      <div class="nav-section-title">Foreign Orders</div>
+      <div class="nav-item" data-view="orders-foreign-technical">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <span>Technical</span>
+        <span class="count" id="count-foreign-technical">—</span>
+      </div>
+      <div class="nav-item" data-view="orders-foreign-indirect">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        <span>Indirect</span>
+        <span class="count" id="count-foreign-indirect">—</span>
+      </div>
+      <div class="nav-item" data-view="orders-foreign-supplychain">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span>Supply Chain</span>
+        <span class="count" id="count-foreign-supplychain">—</span>
+      </div>
+    </div>
+
+    <!-- 3. Local order control -->
+    <div class="nav-section">
+      <div class="nav-section-title">Local Orders</div>
+      <div class="nav-item" data-view="orders-local-technical">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/></svg>
+        <span>Technical</span>
+        <span class="count" id="count-local-technical">—</span>
+      </div>
+      <div class="nav-item" data-view="orders-local-indirect">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
+        <span>Indirect</span>
+        <span class="count" id="count-local-indirect">—</span>
+      </div>
+      <div class="nav-item" data-view="orders-local-supplychain">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Supply Chain</span>
+        <span class="count" id="count-local-supplychain">—</span>
+      </div>
+    </div>
+
+    <!-- 4. Logistics execution -->
+    <div class="nav-section">
+      <div class="nav-section-title">Logistics Operations</div>
+      <div class="nav-group-label">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+        <span>Shipments</span>
+      </div>
+      <div class="nav-item nav-sub" data-view="shipments">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+        <span>Import / Inbound</span>
+        <span class="count" id="count-shipments">—</span>
+      </div>
+      <div class="nav-item nav-sub" data-view="exports">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <span>Exports / Outbound</span>
+        <span class="count" id="count-exports">—</span>
+      </div>
+      <div class="nav-item nav-sub" data-view="partials">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h7v7H4z"/><path d="M13 11h7v7h-7z"/><path d="M11 9l2 2"/><path d="M7.5 13v4H13"/></svg>
+        <span>Partial Shipment Control</span>
+      </div>
+      <div class="nav-item nav-sub" data-view="containers">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9" y1="14.5" x2="15" y2="14.5"/></svg>
+        <span>Container Tracker</span>
+        <span class="count" id="count-containers">—</span>
+      </div>
+      <div class="nav-item" data-view="clearance">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>Clearance Readiness</span>
+        <span class="count" id="count-clearance">—</span>
+      </div>
+    </div>
+
+    <!-- 5. Finance control -->
+    <div class="nav-section">
+      <div class="nav-section-title">Finance Control</div>
+      <div class="nav-item" data-view="forecast">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        <span>Forthcoming Payments</span>
+        <span class="count" id="count-forecast">—</span>
+      </div>
+      <div class="nav-item" data-view="payments">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <span>Payment Requests</span>
+        <span class="count" id="count-payments">—</span>
+      </div>
+      <div class="nav-item" data-view="paymentexposure">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16V9"/><path d="M12 16V5"/><path d="M17 16v-4"/></svg>
+        <span>Payment Exposure</span>
+        <span class="count" id="count-paymentexposure">—</span>
+      </div>
+      <div class="nav-item" data-view="taxprovision">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11H5a2 2 0 00-2 2v7h18v-7a2 2 0 00-2-2h-4"/><path d="M9 11V4a2 2 0 012-2h2a2 2 0 012 2v7"/></svg>
+        <span>Tax Provision Forecast — TEPS</span>
+        <span class="count" id="count-taxprovision">—</span>
+      </div>
+    </div>
+
+    <!-- 6. Records and archives -->
+    <div class="nav-section">
+      <div class="nav-section-title">Records &amp; Archives</div>
+      <div class="nav-item" data-view="closedorders">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        <span>Closed Orders</span>
+        <span class="count" id="count-closedorders">—</span>
+      </div>
+      <div class="nav-item" data-view="documents">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <span>Documents</span>
+        <span class="count" id="count-documents">—</span>
+      </div>
+    </div>
+
+    <!-- 7. Management reporting and controls -->
+    <div class="nav-section">
+      <div class="nav-section-title">Reports &amp; Controls</div>
+      <div class="nav-control-group">Management</div>
+      <div class="nav-item" data-view="mgmtcockpit">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-3"/><path d="M20 16V6"/></svg>
+        <span>Management Cockpit</span>
+        <span class="count" id="count-mgmtcockpit">—</span>
+      </div>
+      <div class="nav-item" data-view="managementpack">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/></svg>
+        <span>Management Pack</span>
+      </div>
+
+      <div class="nav-control-group">Operational Controls</div>
+      <div class="nav-item" data-view="exceptions">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span>Exceptions</span>
+        <span class="count" id="count-exceptions">—</span>
+      </div>
+      <div class="nav-item" data-view="dqcockpit">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M8 12h1"/><path d="M15 12h1"/><path d="M12 7v1"/></svg>
+        <span>Data Quality</span>
+        <span class="count" id="count-dqcockpit">—</span>
+      </div>
+      <div class="nav-item" data-view="otifrisk">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l10 18H2L12 2z"/><path d="M12 8v5"/><path d="M12 17h.01"/></svg>
+        <span>OTIF Risk Forecast</span>
+        <span class="count" id="count-otifrisk">—</span>
+      </div>
+      <div class="nav-item" data-view="workload">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M18 8h5"/><path d="M20.5 5.5v5"/></svg>
+        <span>Officer Workload</span>
+      </div>
+      <div class="nav-item" data-view="opcalendar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
+        <span>Operational Calendar</span>
+      </div>
+
+      <div class="nav-control-group">Performance</div>
+      <div class="nav-item" data-view="scorecards">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <span>Supplier Scorecards</span>
+        <span class="count" id="count-scorecards">—</span>
+      </div>
+      <div class="nav-item" data-view="kpitrends">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
+        <span>KPI Trends</span>
+      </div>
+
+      <div class="nav-control-group">Reference / Reports</div>
+      <div class="nav-item" data-view="reports">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>
+        <span>Reports &amp; Export</span>
+      </div>
+      <div class="nav-item" data-view="suppliers">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        <span>Suppliers</span>
+        <span class="count" id="count-suppliers">—</span>
+      </div>
+    </div>
+
+    <!-- 8. System setup and ERP administration -->
+    <div class="nav-section">
+      <div class="nav-section-title">System Settings</div>
+      <div class="nav-item" data-view="officers">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <span>Officers &amp; Roles</span>
+      </div>
+      <div class="nav-item" data-view="erprecon">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16"/><path d="M4 6h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="1.5" fill="currentColor"/><circle cx="16" cy="18" r="1.5" fill="currentColor"/></svg>
+        <span>ERP Reconciliation</span>
+      </div>
+      <div class="nav-item" data-view="erpimportrules">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><circle cx="12" cy="12" r="4"/><path d="M5.6 5.6l2.1 2.1"/><path d="M16.3 16.3l2.1 2.1"/><path d="M18.4 5.6l-2.1 2.1"/><path d="M7.7 16.3l-2.1 2.1"/></svg>
+        <span>ERP Import Rules</span>
+      </div>
+      <div class="nav-item" data-view="workingcalendars">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+        <span>Working Calendars</span>
+      </div>
+    </div>
+
+  </aside>
+
+  <main class="app-main">
+
+    <!-- ===== 1. WORKBENCH ===== -->
+    <section class="view active" id="view-dashboard">
+      <div class="page-head">
+        <div class="title">
+          <h1>Dashboard</h1>
+          <span class="desc">Operational overview — live across the team</span>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-sm" id="refresh-dashboard">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div id="dashboard-firstrun"></div>
+
+      <div id="dashboard-filters"></div>
+
+      <div class="metric-grid" id="metric-grid"><!-- metrics injected --></div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><h3>Procurement Risk &amp; Ageing</h3></div>
+          <div id="risk-ageing-panel"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Supplier Chase Plan</h3></div>
+          <div id="supplier-chase-panel"></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><h3>Shipment Status Distribution</h3><span class="text-xs text-muted" id="dashboard-as-of"></span></div>
+          <div class="bar-list" id="status-bars"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Workload by Officer</h3></div>
+          <div class="bar-list" id="officer-bars"></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-head"><h3>Upcoming Payments — Next 30 Days</h3></div>
+          <div id="upcoming-payments"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Alerts</h3></div>
+          <div id="alerts-panel"></div>
+        </div>
+      </div>
+    </section>
+    <section class="view" id="view-mywork"></section>
+    <section class="view" id="view-ordercard"></section>
+    <section class="view" id="view-teamwork"></section>
+
+    <!-- ===== 2. FOREIGN ORDER CONTROL ===== -->
+    <section class="view" id="view-orders-foreign-technical"></section>
+    <section class="view" id="view-orders-foreign-indirect"></section>
+    <section class="view" id="view-orders-foreign-supplychain"></section>
+
+    <!-- ===== 3. LOCAL ORDER CONTROL ===== -->
+    <section class="view" id="view-orders-local-technical"></section>
+    <section class="view" id="view-orders-local-indirect"></section>
+    <section class="view" id="view-orders-local-supplychain"></section>
+
+    <!-- ===== 4. LOGISTICS EXECUTION ===== -->
+    <section class="view" id="view-shipments"></section>
+    <section class="view" id="view-containers"></section>
+    <section class="view" id="view-partials"></section>
+    <section class="view" id="view-clearance"></section>
+    <section class="view" id="view-exports"></section>
+
+    <!-- ===== 5. FINANCE CONTROL ===== -->
+    <section class="view" id="view-forecast"></section>
+    <section class="view" id="view-payments"></section>
+    <section class="view" id="view-paymentexposure"></section>
+    <section class="view" id="view-taxprovision"></section>
+
+    <!-- ===== 6. RECORDS AND ARCHIVES ===== -->
+    <section class="view" id="view-closedorders"></section>
+    <section class="view" id="view-documents"></section>
+
+    <!-- ===== 7. MANAGEMENT REPORTING AND CONTROLS ===== -->
+    <section class="view" id="view-reports"></section>
+    <section class="view" id="view-suppliers"></section>
+    <section class="view" id="view-mgmtcockpit"></section>
+    <section class="view" id="view-otifrisk"></section>
+    <section class="view" id="view-workload"></section>
+    <section class="view" id="view-opcalendar"></section>
+    <section class="view" id="view-managementpack"></section>
+    <section class="view" id="view-dqcockpit"></section>
+    <section class="view" id="view-scorecards"></section>
+    <section class="view" id="view-exceptions"></section>
+    <section class="view" id="view-kpitrends"></section>
+
+    <!-- ===== 8. SYSTEM SETUP AND ERP ADMINISTRATION ===== -->
+    <section class="view" id="view-officers"></section>
+    <section class="view" id="view-erprecon"></section>
+    <section class="view" id="view-erpimportrules"></section>
+    <section class="view" id="view-workingcalendars"></section>
+
+  </main>
+
+</div>
+
+<!-- ============================================================
+     MODAL CONTAINER
+     ============================================================ -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal"><!-- contents injected --></div>
+</div>
+
+<!-- Print view for Payment Request Form -->
+<div class="print-view" id="print-view">
+  <div class="print-actions no-print">
+    <button class="btn" id="print-back">← Back</button>
+    <button class="btn btn-primary" onclick="window.print()">🖨️ Print / Save PDF</button>
+  </div>
+  <div id="print-form-content"></div>
+</div>
+
+<div id="toasts"></div>
+<div id="global-progress" class="global-progress" style="display:none">
+  <div class="gp-row">
+    <span class="gp-spinner"></span>
+    <span class="gp-label" id="gp-label">Working…</span>
+    <span class="gp-count" id="gp-count"></span>
+    <button class="gp-stop" id="gp-stop" style="display:none">Stop</button>
+  </div>
+  <div class="gp-track"><div class="gp-fill" id="gp-fill"></div></div>
+</div>
+
+<!-- ============================================================
+     APP SCRIPT
+     ============================================================ -->
+  <script type="module" src="src/core.js"></script>
+  <script type="module" src="src/globalProgress.js"></script>
+  <script type="module" src="src/erpOwnership.js"></script>
+  <script type="module" src="src/schema.js"></script>
+  <script type="module" src="src/workflows.js"></script>
+  <script type="module" src="src/validators.js"></script>
+  <script type="module" src="src/permissions.js"></script>
+  <script type="module" src="src/firestoreStore.js"></script>
+  <script type="module" src="src/importRules.js"></script>
+  <script type="module" src="src/documentService.js"></script>
+  <script type="module" src="src/dataQuality.js"></script>
+  <script type="module" src="src/controls.js"></script>
+  <script type="module" src="src/procurementFollowup.js"></script>
+  <script type="module" src="src/followupSnooze.js"></script>
+  <script type="module" src="src/myWork.js"></script>
+  <script type="module" src="src/modules/dashboard.js"></script>
+  <script type="module" src="src/modules/orders/orders.service.js"></script>
+  <script type="module" src="src/modules/orders/orders.sortfilter.js"></script>
+  <script type="module" src="src/modules/orders/orders.render.js"></script>
+  <script type="module" src="src/modules/orders/orders.form.js"></script>
+  <script type="module" src="src/modules/orders/updateRequests.js"></script>
+  <script type="module" src="src/modules/orders/contactLog.js"></script>
+  <script type="module" src="src/modules/orders/orders.detail.js"></script>
+  <script type="module" src="src/modules/documents/documents.render.js"></script>
+  <script type="module" src="src/modules/shipments/shipments.service.js"></script>
+  <script type="module" src="src/modules/shipments/shipments.render.js"></script>
+  <script type="module" src="src/modules/shipments/shipments.form.js"></script>
+  <script type="module" src="src/modules/shipments/shipmentJourney.js"></script>
+  <script type="module" src="src/modules/shipments/shipments.detail.js"></script>
+  <script type="module" src="src/modules/shipments/containers.render.js"></script>
+  <script type="module" src="src/modules/shipments/exports.js"></script>
+  <script type="module" src="src/modules/payments/payments.service.js"></script>
+  <script type="module" src="src/modules/payments/payments.render.js"></script>
+  <script type="module" src="src/modules/payments/payments.form.js"></script>
+  <script type="module" src="src/modules/payments/payments.detail.js"></script>
+  <script type="module" src="src/modules/payments/forecast.render.js"></script>
+  <script type="module" src="src/modules/shipments/taxprovision.service.js"></script>
+  <script type="module" src="src/modules/shipments/taxprovision.render.js"></script>
+  <script type="module" src="src/modules/suppliers/suppliers.service.js"></script>
+  <script type="module" src="src/modules/suppliers/suppliers.render.js"></script>
+  <script type="module" src="src/modules/suppliers/suppliers.form.js"></script>
+  <script type="module" src="src/modules/officers.js"></script>
+  <script type="module" src="src/modules/importRules.js"></script>
+  <script type="module" src="src/modules/workingCalendars.js"></script>
+  <script type="module" src="src/modules/reports/reports.service.js"></script>
+  <script type="module" src="src/modules/reports/importHistory.js"></script>
+  <script type="module" src="src/modules/reports/reports.render.js"></script>
+  <script type="module" src="src/modules/reports/reports.form.js"></script>
+  <script type="module" src="src/modules/reports/erpImport.js"></script>
+  <script type="module" src="src/modules/reports/dqCockpit.js"></script>
+  <script type="module" src="src/modules/reports/scorecards.js"></script>
+  <script type="module" src="src/modules/reports/exceptions.js"></script>
+  <script type="module" src="src/modules/reports/kpi.js"></script>
+  <script type="module" src="src/modules/reports/kpiTrends.js"></script>
+  <script type="module" src="src/modules/reports/managementControls.js"></script>
+  <script type="module" src="src/operational.js"></script>
+  <script type="module" src="src/warehouseAdapter.js"></script>
+  <script type="module" src="src/erpAdapter.js"></script>
+  <script type="module" src="src/bcStructure.js"></script>
+  <script type="module" src="src/teamWork.js"></script>
+  <script type="module" src="src/fastTab.js"></script>
+  <script type="module" src="src/bcCardPage.js"></script>
+
+<!-- ============================================================
+     MODULE: DASHBOARD
+     ============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: ORDERS (Foreign & Local)
+     ============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: SHIPMENTS
+     ============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: PAYMENT REQUESTS (incl. printable RFP form)
+     ============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: SUPPLIERS
+     ============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: OFFICERS
+     ============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: REPORTS
+     ============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: OPERATIONAL SECTIONS (Phoenix-owned)
+     Reusable Documents / Follow-ups / Issues sections used across
+     order, shipment, payment and supplier detail screens.
+     All data here is PHOENIX-OWNED (never ERP-owned).
+============================================================ -->
+
+
+<!-- ============================================================
+     MODULE: ERP ADAPTER LAYER  (structure only — NO live calls / NO credentials)
+     ============================================================
+     Phoenix is an OPERATIONAL CONTROL LAYER on top of the ERP.
+     Architecture (read-only for v1):
+
+        ERP (Navision now → Business Central later)
+          → middleware / integration layer (Azure Function, Power Automate,
+            internal API — holds credentials, does the actual fetch)
+          → Phoenix database (Firestore)
+          → Phoenix UI (this app)
+
+     The browser NEVER talks to the ERP directly (would expose credentials and
+     be unsecurable). This module only defines the *shape* the future middleware
+     will plug into, plus the neutral data-mapping points and status mapping.
+     Swapping Navision → Business Central later means replacing only the
+     adapter's fetch half; the app and the neutral contract do not change.
+============================================================ -->
+
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// ============================================================================
+// Phoenix Procurement — Firestore security rules: INTERIM INTERNAL-LOCKED path
+// ----------------------------------------------------------------------------
+// Use this ONLY for an internal launch WITHOUT per-user login (Runbook §4 Path B),
+// as a documented, management-accepted interim measure. It requires Firebase
+// Anonymous Auth to be enabled (the app already signs in anonymously) so that at
+// least an auth token is present, and it should be combined with NETWORK-level
+// restriction (VPN / IP allow-list / internal-only hosting) — these rules alone do
+// NOT identify individual users.
+//
+// LIMITATION (be honest with management): without real login, these rules cannot
+// distinguish one employee from another or enforce per-role write limits reliably.
+// They prevent anonymous public read/write of your data, but a user on the network
+// can act with full rights. This is weaker than the authenticated path and should
+// be replaced by it. REVIEW, test in the Rules Playground, then deploy.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Require at least an authenticated session (the app's anonymous sign-in).
+    // Public/unauthenticated access is denied outright.
+    function hasSession() {
+      return request.auth != null;
+    }
+
+    // ---- default deny ------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---- business + operational collections: session required --------------
+    // No per-role enforcement here (no verified identity); rely on network lock +
+    // the app's own role gating for separation of duties in the interim.
+    match /orders/{id}          { allow read, write: if hasSession(); }
+    match /shipments/{id}       { allow read, write: if hasSession(); }
+    match /payment_requests/{id}{ allow read, write: if hasSession(); }
+    match /suppliers/{id}       { allow read, write: if hasSession(); }
+    match /documents/{id}       { allow read, write: if hasSession(); }
+    match /followups/{id}       { allow read, write: if hasSession(); }
+    match /issues/{id}          { allow read, write: if hasSession(); }
+    match /updateRequests/{id}  { allow read, write: if hasSession(); }
+    match /contactLog/{id}      { allow read, write: if hasSession(); }
+    match /kpiSnapshot/{id}     { allow read, write: if hasSession(); }
+    match /officers/{id}        { allow read, write: if hasSession(); }
+    match /system_config/{id}   { allow read, write: if hasSession(); }
+
+    // ---- status_log: append-only even in the interim model -----------------
+    match /status_log/{id} {
+      allow read, create: if hasSession();
+      allow update, delete: if false;
+    }
+  }
+}

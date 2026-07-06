@@ -1,0 +1,121 @@
+rules_version = '2';
+
+// ============================================================================
+// Phoenix Procurement — Firestore security rules: AUTHENTICATED path
+// ----------------------------------------------------------------------------
+// Use this when per-user login (Azure AD / M365 → Firebase Auth) is wired (Runbook
+// §4 Path A). It enforces, SERVER-SIDE, that:
+//   - only signed-in users can read or write,
+//   - a user's role comes from their officers/{uid} record (the trusted source),
+//   - writes to business collections require an appropriate role,
+//   - the audit log is append-only,
+//   - nobody can edit their own role to elevate themselves.
+//
+// REVIEW BEFORE DEPLOYING. Adapt collection/role mappings to your final model, test
+// in the Firebase Rules Playground, then: firebase deploy --only firestore:rules
+// This template is a STARTING POINT, not a finished policy.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers -----------------------------------------------------------
+    function signedIn() {
+      return request.auth != null;
+    }
+    // The caller's officer record holds their role. officers/{uid} == auth uid.
+    function myOfficer() {
+      return get(/databases/$(database)/documents/officers/$(request.auth.uid)).data;
+    }
+    function myRole() {
+      return signedIn() ? myOfficer().role : 'none';
+    }
+    function isAdmin()       { return myRole() == 'admin'; }
+    function isProcurement() {
+      return myRole() in ['procurement_senior_manager', 'procurement_manager',
+                          'procurement_supervisor', 'procurement_officer'] || isAdmin();
+    }
+    function isLogistics() {
+      return myRole() in ['logistics_manager', 'logistics_officer'] || isAdmin();
+    }
+    function isFinance() {
+      return myRole() == 'finance' || isAdmin();
+    }
+    function isDemandPlanning() {
+      return myRole() in ['demand_supervisor', 'demand_officer'] || isAdmin();
+    }
+    function canWritePayments() {
+      return myRole() in ['procurement_supervisor', 'procurement_officer'] || isAdmin();
+    }
+
+    // ---- default: deny everything not explicitly allowed -------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ---- officers: read by any signed-in user; only admin manages others ---
+    // A user may read all officers (needed for assignment dropdowns) but may NOT
+    // change their own role (anti-self-elevation): role edits are admin-only.
+    match /officers/{uid} {
+      allow read: if signedIn();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+                    || (request.auth.uid == uid
+                        && request.resource.data.role == resource.data.role); // can edit self but NOT role
+    }
+
+    // ---- orders: procurement creates/edits; everyone signed-in reads -------
+    match /orders/{id} {
+      allow read:   if signedIn();
+      allow create, update: if isProcurement();
+      allow delete: if isAdmin();
+    }
+
+    // ---- shipments: logistics creates/edits --------------------------------
+    match /shipments/{id} {
+      allow read:   if signedIn();
+      allow create, update: if isLogistics();
+      allow delete: if isAdmin();
+    }
+
+    // ---- payment_requests: read for signed-in users; write only for RFP owners
+    match /payment_requests/{id} {
+      allow read:   if signedIn();
+      allow create, update: if canWritePayments();
+      allow delete: if isAdmin();
+    }
+
+    // ---- suppliers: procurement maintains ----------------------------------
+    match /suppliers/{id} {
+      allow read:   if signedIn();
+      allow create, update: if isProcurement();
+      allow delete: if isAdmin();
+    }
+
+    // ---- shared operational collections: any signed-in user may contribute -
+    // (documents, follow-ups, issues, update requests, contact log) — these are
+    // collaborative across procurement + logistics. Tighten per-role if required.
+    match /documents/{id}      { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+    match /followups/{id}      { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+    match /issues/{id}         { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+    match /updateRequests/{id} { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+    match /contactLog/{id}     { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+
+    // ---- kpiSnapshot: any signed-in user may capture; admin may delete -----
+    match /kpiSnapshot/{id}    { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+
+    // ---- status_log: APPEND-ONLY audit trail -------------------------------
+    // Anyone signed-in may add an entry; nobody may modify or delete one.
+    match /status_log/{id} {
+      allow read:   if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // ---- system_config: admin only -----------------------------------------
+    match /system_config/{id} {
+      allow read:  if signedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

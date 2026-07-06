@@ -1,0 +1,263 @@
+# Phoenix Procurement - Architecture
+
+Last reviewed: 2026-07-06
+
+## Current technical stack
+
+- Browser application written in plain JavaScript, HTML, and CSS.
+- Modular source under `src/`.
+- CSS in `styles/main.css`.
+- HTML shell in `index.html`.
+- Generated single-file HTML build through `build.py`.
+- Firebase Web SDK loaded from Google CDN:
+  - Firebase App
+  - Firebase Auth
+  - Cloud Firestore
+- Firestore is the current database.
+- No npm package, bundler, TypeScript, or framework is used.
+- Python build tooling is used for concatenation, data dictionary generation, and invariant checks.
+- Node is used by `build.py` for JavaScript syntax checking only.
+
+## Source and build architecture
+
+The source of truth is:
+
+- `src/**/*.js`
+- `styles/main.css`
+- `index.html`
+- `src/schema.js` for schema/data dictionary
+
+The generated artifact is:
+
+- `dist/phoenix-procurement-DEMO.html`
+
+`build.py` performs the following:
+
+1. Regenerates `docs/DATA_DICTIONARY.md` from `src/schema.js`.
+2. Checks that the generated data dictionary is in sync.
+3. Checks each JavaScript module with `node --check` when Node is available.
+4. Inlines `styles/main.css` into `index.html`.
+5. Inlines every module listed in `build.py` in the exact expected order.
+6. Writes `dist/phoenix-procurement-DEMO.html`.
+7. Runs structural invariants in `tools/check_invariants.py`.
+
+The production package is generated from the same source with production settings in `APP_CONFIG`.
+
+## Frontend architecture
+
+The application uses a modular-but-global browser architecture. Each module is loaded as a `<script type="module">`, and cross-module APIs are exposed deliberately on `window`.
+
+Important globals:
+
+- `window.APP_CONFIG` - demo/production flags and Firebase config.
+- `window.REF` - reference data, permissions, entities, statuses, document rules, ERP ownership.
+- `window.__state` - live state, filters, active view, active entity, loaded data, officer/user.
+- `window.__renderers` - view renderer registry.
+- `window.PXUtils` - shared formatting, navigation, permissions, entity helpers, list helpers, export helpers, etc.
+- `window.PXStore` - central Firestore write path.
+- `window.PXSchema` - declarative schema and data dictionary source.
+- `window.PXOwnership` - ERP/Phoenix field ownership.
+- `window.PXValidators` - validation layer.
+- `window.PXPermissions` - record-aware permission layer.
+- `window.PXWorkflows` - transition helpers.
+- `window.PXDocuments` - document metadata and SharePoint-ready folder path logic.
+- `window.PXWarehouse` - future Data Warehouse adapter contract.
+- `window.PXProcFollowup` - procurement follow-up and risk engine.
+
+UI structure:
+
+- `src/bcStructure.js` applies the Business Central-style top navigation.
+- `src/bcCardPage.js` renders order detail in a Business Central-style card page.
+- `src/fastTab.js` supports FastTab interaction.
+- `styles/main.css` contains the Phoenix Business Central theme layer.
+
+List screens are progressively using:
+
+- Card/table toggles through `PXView`.
+- Card rendering helpers through `PXCards`.
+- Business Central-like filter panes where applicable.
+- Column manager and export controls on dense tables.
+
+## Module architecture
+
+Major foundation modules:
+
+- `core.js` - Firebase setup, APP_CONFIG, REF, state, navigation, utility helpers, subscriptions.
+- `schema.js` - data dictionary source.
+- `erpOwnership.js` - ownership rules and ERP field maps.
+- `workflows.js` - status transition rules.
+- `validators.js` - data validation.
+- `permissions.js` - record-aware permission helpers.
+- `firestoreStore.js` - central writes, validation, permissions, audit.
+- `dataQuality.js` - record-health checks and working-day calculations.
+- `procurementFollowup.js` - risk scoring, ageing, commitment, chase, ERP/DW exception checks.
+- `documentService.js` - SharePoint-ready document folder metadata.
+- `warehouseAdapter.js` - future Data Warehouse contract.
+- `erpAdapter.js` - compatibility facade for older ERP UI calls.
+
+Domain modules generally follow:
+
+- `*.service.js` for data helpers and write orchestration.
+- `*.render.js` for list/page rendering.
+- `*.form.js` for create/edit forms.
+- `*.detail.js` for detail screens.
+
+Major domain folders:
+
+- `src/modules/orders`
+- `src/modules/shipments`
+- `src/modules/payments`
+- `src/modules/suppliers`
+- `src/modules/reports`
+- `src/modules/documents`
+
+## Backend architecture
+
+There is no custom backend server in this repository.
+
+Current backend services:
+
+- Firebase Authentication
+- Cloud Firestore
+
+Current client behaviour:
+
+- Subscribes to Firestore collections with `onSnapshot`.
+- Writes through `PXStore`.
+- Generates client-side reports, exports, and Excel/CSV artifacts.
+- Reads Excel imports in the browser as a manual staging feed.
+
+Future backend/integration services:
+
+- Data Warehouse/staging feed.
+- Controlled sync/API service between Data Warehouse and Firestore.
+- Microsoft Graph adapter for SharePoint uploads.
+- Production identity/SSO service if Azure AD/OIDC/custom token path is chosen.
+
+## Database architecture
+
+Database: Cloud Firestore.
+
+Collections in `src/schema.js`:
+
+- `orders`
+- `shipments`
+- `payment_requests`
+- `exports`
+- `suppliers`
+- `officers`
+- `documents`
+- `followups`
+- `issues`
+- `updateRequests`
+- `contactLog`
+- `kpiSnapshot`
+- `status_log`
+- `system_config`
+
+Key concepts:
+
+- `orders` is the operational spine. ERP-owned header fields and Phoenix-owned follow-up fields live together, with ownership controls.
+- `shipments` are Phoenix-owned logistics records linked by `orderId`.
+- `payment_requests` are Phoenix-owned RFP records linked by `orderId` and optional milestone.
+- `orders.receipts[]` stores GRN control rows. GRNs can be order-level or shipment-linked.
+- `documents` store metadata, status, links, and demo upload data.
+- `followups`, `issues`, `updateRequests`, and `contactLog` support operational action flow.
+- `system_config` stores shared configuration such as import rules, working calendars, and counters.
+- `status_log` stores audit/change/import-history entries.
+
+The database currently has no migrations folder. Schema changes are made by updating `src/schema.js`, validators, forms, renderers, and any import/export logic. The generated data dictionary is the persistent schema documentation.
+
+## Authentication and authorization architecture
+
+Authentication modes:
+
+- Demo: `APP_CONFIG.demoMode = true`, `authMode = 'demo'`. Uses Firebase anonymous/demo flow and allows demo role switching.
+- Production: `APP_CONFIG.demoMode = false`, `authMode = 'password'`. Uses Firebase Auth email/password and individual user credentials.
+
+Officer profile resolution in production mode:
+
+1. `officers/{uid}` document.
+2. First officer where `authUid == user.uid`.
+3. First officer where `email == user.email`.
+
+Authorization layers:
+
+- `REF.permissions` is the resource/action matrix.
+- `REF.viewAccess` controls hidden and view-only views.
+- `PXUtils.can(resource, action)` checks the current role.
+- `PXPermissions.can(action, record)` adds record-aware checks.
+- `PXStore.assertWriteAllowed()` blocks create/update/archive/restore when the current role lacks write permission.
+- Production mode fails closed for unknown roles/resources.
+
+Important limitation:
+
+- Client-side authorization is not enough for production. Firestore security rules must enforce the same access model server-side. Templates exist in `docs/FIRESTORE_RULES`.
+
+## API structure
+
+There is no HTTP API in this repository.
+
+Internal JavaScript APIs are exposed as `window.PX*` services and `window.__*` bridges. Important examples:
+
+- `PXStore.*` for writes.
+- `PXWarehouse.*` for future warehouse integration contract.
+- `PhoenixERP` facade in `erpAdapter.js` for compatibility.
+- `PXPoImport.*` for Excel import.
+- `PXXlsxReader.readWorkbook()` for browser XLSX reading.
+- `PXDocuments.*` for document folder/path metadata.
+- `PXProcFollowup.*` for control/risk calculations.
+
+## Important services and dependencies
+
+External:
+
+- Firebase Web SDK CDN.
+- Firebase Auth.
+- Cloud Firestore.
+
+Internal:
+
+- `build.py`.
+- `tools/gen_data_dictionary.py`.
+- `tools/check_invariants.py`.
+- `docs/FIRESTORE_RULES` templates.
+
+No third-party frontend package manager dependencies are currently declared.
+
+## Integration architecture
+
+Current integration:
+
+- Manual Excel import from Navision/Business Central exports.
+- Imported rows are treated as staging records and stamped with `integrationLayer`, `warehouseSource`, `warehouseRecordId`, `warehouseBatchId`, and warehouse timing fields.
+
+Future integration:
+
+- Navision / Business Central -> Data Warehouse/staging -> controlled sync/API service -> Firestore.
+- Browser must not directly access ERP or Data Warehouse.
+- Sync may refresh ERP-owned and ERP-seeded fields only.
+- Sync must not overwrite Phoenix-owned operational fields.
+
+Document integration:
+
+- Current app builds SharePoint-ready metadata and paths.
+- Future Microsoft Graph adapter will create folders and upload/save files using those paths.
+
+## Deployment architecture
+
+Current demo deployment:
+
+- Double-click or open `dist/phoenix-procurement-DEMO.html`.
+- Can run over `file://` for demo/OneDrive sharing.
+- Modular source can be served locally with `python -m http.server`.
+
+Intended production deployment:
+
+- Generate a production HTML build from the same source with demo mode disabled and password auth enabled.
+- Serve over HTTPS from an approved server/static host.
+- Use a dedicated production Firebase project.
+- Deploy reviewed Firestore security rules.
+- Restrict Firebase API key to approved domains and APIs.
+- Use individual user credentials or corporate SSO.
+- Keep ERP and SharePoint integrations server-side.
