@@ -146,7 +146,7 @@ window.__renderers['dashboard'] = function() {
           <h2>Business Assistance</h2>
         </div>
         <div class="bc-rc-panel-grid">
-          <div class="bc-rc-panel">
+          <div class="bc-rc-panel bc-rc-panel-risk">
             <div class="card-head"><h3>Procurement Risk &amp; Ageing</h3></div>
             <div id="risk-ageing-panel"></div>
           </div>
@@ -412,13 +412,13 @@ window.__renderers['dashboard'] = function() {
           </div>`;
         }).join('')}
       </div>` : '<div class="text-muted text-sm">No open orders for this filter.</div>'}
-      ${topRows.length ? `<div class="table-wrap"><table class="data" style="margin:-1px 0">
+      ${topRows.length ? `<div class="table-wrap"><table class="data dashboard-risk-table" style="margin:-1px 0">
         <thead><tr><th>Order</th><th>Supplier</th><th>Risk</th><th>Reason</th></tr></thead>
         <tbody>${topRows.map(r => `<tr onclick="openOrderDetail('${r.order.id}')">
           <td><span class="mono">${escapeHtml(r.order.orderId || '—')}</span></td>
-          <td class="truncate">${escapeHtml(r.order.supplier || '—')}</td>
+          <td class="dashboard-risk-supplier" title="${escapeHtml(r.order.supplier || '')}">${escapeHtml(r.order.supplier || '—')}</td>
           <td><span class="badge ${r.risk.cls}">${escapeHtml(r.risk.level)} ${r.risk.score}</span></td>
-          <td class="text-xs truncate" title="${escapeHtml(r.risk.reasons[0] || '')}">${escapeHtml(r.risk.reasons[0] || '—')}</td>
+          <td class="dashboard-risk-reason text-xs" title="${escapeHtml(r.risk.reasons[0] || '')}">${escapeHtml(r.risk.reasons[0] || '—')}</td>
         </tr>`).join('')}</tbody>
       </table></div>` : '<div class="text-muted text-sm">No elevated procurement risk detected.</div>'}
     `;

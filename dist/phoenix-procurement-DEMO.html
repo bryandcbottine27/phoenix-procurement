@@ -1547,11 +1547,12 @@ body.bc-struct .bc-appbar .user-chip .role { color: rgba(255,255,255,0.8); font-
 
 /* Row 2: horizontal menu bar */
 body.bc-struct .bc-menubar {
-  display: flex; align-items: stretch; gap: 0;
+  display: flex; align-items: stretch; gap: 0; flex-wrap: wrap;
   background: var(--surface); border-bottom: 1px solid var(--line);
   padding: 0 10px; box-shadow: var(--shadow-sm); position: relative; z-index: 400;
+  overflow-x: clip;
 }
-body.bc-struct .bc-nav-group { position: relative; display: flex; align-items: stretch; }
+body.bc-struct .bc-nav-group { position: relative; display: flex; align-items: stretch; flex: 0 0 auto; }
 body.bc-struct .bc-nav-btn {
   display: flex; align-items: center; gap: 5px; height: 42px; padding: 0 14px;
   font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
@@ -1574,13 +1575,18 @@ body.bc-struct .bc-nav-menu .nav-item .count { margin-left: auto; }
 
 /* Entity switcher pinned to the right of the menu bar */
 body.bc-struct .bc-menubar .entity-switcher {
-  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  flex: 1 1 300px; min-width: 0; max-width: 420px;
   padding: 0 6px 0 14px; border: none; border-left: 1px solid var(--line);
   background: transparent; /* override the sidebar's warm background */
 }
 body.bc-struct .bc-menubar .entity-switcher-label { display: none; }
-body.bc-struct .bc-menubar .entity-tabs { display: flex; flex-direction: row !important; gap: 4px; }
-body.bc-struct .bc-menubar .entity-tab { padding: 5px 11px !important; font-size: 12px; border-radius: var(--radius-sm); cursor:pointer; white-space: nowrap; }
+body.bc-struct .bc-menubar .entity-tabs {
+  display: flex; flex-direction: row !important; gap: 4px;
+  min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+}
+body.bc-struct .bc-menubar .entity-tabs::-webkit-scrollbar { display: none; }
+body.bc-struct .bc-menubar .entity-tab { flex: 0 0 auto; padding: 5px 11px !important; font-size: 12px; border-radius: var(--radius-sm); cursor:pointer; white-space: nowrap; }
 
 /* Full-width content */
 body.bc-struct .app-main { margin-left: 0; margin-top: 0; padding: 22px 28px 60px; }
@@ -1956,6 +1962,7 @@ body.bc-struct .bc-menubar {
   background: #fff;
   border-bottom: 1px solid var(--line-strong);
   box-shadow: 0 1px 2px rgba(0, 41, 85, 0.08);
+  overflow-x: clip;
 }
 body.bc-struct .bc-nav-btn {
   height: 43px;
@@ -2233,16 +2240,17 @@ body.bc-struct #view-dashboard {
   padding: 0;
 }
 body.bc-struct .bc-role-center {
-  max-width: 1220px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 4px 40px;
+  padding: 0 8px 44px;
 }
 body.bc-struct .bc-rc-toplinks {
   display: flex;
   align-items: center;
   gap: 20px;
-  min-height: 42px;
-  border-bottom: 1px solid transparent;
+  min-height: 36px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
 body.bc-struct .bc-rc-company {
   display: inline-flex;
@@ -2259,7 +2267,7 @@ body.bc-struct .bc-rc-links {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 18px;
+  gap: 16px;
 }
 body.bc-struct .bc-rc-links button,
 body.bc-struct .bc-rc-action {
@@ -2279,8 +2287,13 @@ body.bc-struct .bc-rc-action:hover {
 body.bc-struct .bc-rc-hero {
   display: grid;
   grid-template-columns: minmax(320px, 1.2fr) minmax(320px, 0.9fr);
-  gap: 44px;
-  padding: 18px 0 26px;
+  gap: 34px;
+  align-items: start;
+  padding: 18px 20px 20px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #F8FAFC;
 }
 body.bc-struct .bc-rc-eyebrow,
 body.bc-struct .bc-rc-actions-title {
@@ -2292,7 +2305,7 @@ body.bc-struct .bc-rc-actions-title {
 body.bc-struct .bc-rc-statement {
   max-width: 560px;
   color: #111827;
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1.18;
   font-weight: 300;
   letter-spacing: 0;
@@ -2319,13 +2332,13 @@ body.bc-struct .bc-rc-dots span.on {
 body.bc-struct .bc-rc-action-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(130px, 1fr));
-  gap: 6px 24px;
+  gap: 8px 24px;
 }
 body.bc-struct .bc-rc-filterbox {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   padding: 6px 0;
-  margin-bottom: 16px;
+  margin: 14px 0 16px;
 }
 body.bc-struct .bc-rc-filterbox summary {
   color: var(--primary);
@@ -2340,8 +2353,8 @@ body.bc-struct .bc-rc-filterbox .toolbar {
 }
 body.bc-struct .bc-rc-section {
   border-top: 2px solid var(--primary-dark);
-  padding-top: 8px;
-  margin-top: 18px;
+  padding-top: 10px;
+  margin-top: 20px;
 }
 body.bc-struct .bc-rc-section-head {
   display: flex;
@@ -2355,63 +2368,70 @@ body.bc-struct .bc-rc-section h2 {
   font-weight: 700;
 }
 body.bc-struct #view-dashboard .metric-grid.bc-activity-strip {
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
-  gap: 0;
-  margin-bottom: 18px;
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 0;
 }
 body.bc-struct #view-dashboard .metric {
-  border: 0;
-  border-radius: 0;
-  border-right: 1px solid var(--line);
-  padding: 8px 18px 14px 0;
-  background: transparent;
+  min-height: 86px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px 12px 14px;
+  background: #fff;
+  box-shadow: none;
 }
 body.bc-struct #view-dashboard .metric:last-child {
-  border-right: 0;
+  border-right: 1px solid var(--line);
 }
 body.bc-struct #view-dashboard .metric::before {
-  top: auto;
-  right: 18px;
-  bottom: 5px;
+  top: 0;
+  right: auto;
+  bottom: 0;
   left: 0;
-  width: auto;
-  height: 3px;
+  width: 4px;
+  height: auto;
 }
 body.bc-struct #view-dashboard .metric .label {
-  min-height: 28px;
+  min-height: 30px;
   color: var(--ink-soft);
   font-size: 11px;
   text-transform: none;
   letter-spacing: 0;
 }
 body.bc-struct #view-dashboard .metric .value {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 300;
   color: #111827;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 body.bc-struct .bc-rc-tile-area {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
   margin: 16px 0 24px;
   padding-bottom: 22px;
   border-bottom: 1px solid var(--line);
 }
 body.bc-struct .bc-rc-tile-group h3 {
-  margin-bottom: 7px;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
   color: #111827;
   font-size: 12px;
   font-weight: 700;
 }
 body.bc-struct .bc-rc-tile-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(106px, 1fr));
   gap: 6px;
 }
 body.bc-struct .bc-rc-tile {
   position: relative;
-  min-height: 88px;
+  min-height: 84px;
   border: 0;
   background: var(--primary);
   color: #fff;
@@ -2470,12 +2490,19 @@ body.bc-struct .bc-rc-tile.danger {
 body.bc-struct .bc-rc-panel-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 18px 22px;
+  gap: 14px;
+  align-items: start;
 }
 body.bc-struct .bc-rc-panel {
   min-width: 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--line);
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  box-shadow: none;
+}
+body.bc-struct .bc-rc-panel-risk {
+  grid-column: 1 / -1;
 }
 body.bc-struct .bc-rc-panel.wide {
   grid-column: span 1;
@@ -2487,6 +2514,47 @@ body.bc-struct .bc-rc-panel .card-head h3 {
   color: #111827;
   font-size: 13px;
   font-weight: 700;
+}
+body.bc-struct #view-dashboard .bar-list {
+  gap: 9px;
+}
+body.bc-struct #view-dashboard .bar-item .lbl {
+  width: 136px;
+  min-width: 0;
+}
+body.bc-struct #view-dashboard .bar-item .bar-track {
+  min-width: 80px;
+}
+body.bc-struct #risk-ageing-panel .table-wrap,
+body.bc-struct #supplier-chase-panel .table-wrap,
+body.bc-struct #upcoming-payments .table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+body.bc-struct .dashboard-risk-table {
+  min-width: 760px;
+}
+body.bc-struct .dashboard-risk-table th:nth-child(1),
+body.bc-struct .dashboard-risk-table td:nth-child(1) {
+  width: 110px;
+}
+body.bc-struct .dashboard-risk-table th:nth-child(2),
+body.bc-struct .dashboard-risk-table td:nth-child(2) {
+  width: 210px;
+}
+body.bc-struct .dashboard-risk-table th:nth-child(3),
+body.bc-struct .dashboard-risk-table td:nth-child(3) {
+  width: 110px;
+}
+body.bc-struct .dashboard-risk-supplier {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+body.bc-struct .dashboard-risk-reason {
+  min-width: 280px;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 /* Lists: dense BC grids with Phoenix header treatment and stable scanning. */
@@ -2614,9 +2682,12 @@ body.bc-struct .sync-status {
     grid-template-columns: 1fr;
   }
   body.bc-struct #view-dashboard .metric {
-    border-right: 0;
+    border-right: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
-    padding-right: 0;
+    padding-right: 12px;
+  }
+  body.bc-struct .bc-rc-panel-risk {
+    grid-column: auto;
   }
 }
 
@@ -10125,7 +10196,7 @@ window.__renderers['dashboard'] = function() {
           <h2>Business Assistance</h2>
         </div>
         <div class="bc-rc-panel-grid">
-          <div class="bc-rc-panel">
+          <div class="bc-rc-panel bc-rc-panel-risk">
             <div class="card-head"><h3>Procurement Risk &amp; Ageing</h3></div>
             <div id="risk-ageing-panel"></div>
           </div>
@@ -10391,13 +10462,13 @@ window.__renderers['dashboard'] = function() {
           </div>`;
         }).join('')}
       </div>` : '<div class="text-muted text-sm">No open orders for this filter.</div>'}
-      ${topRows.length ? `<div class="table-wrap"><table class="data" style="margin:-1px 0">
+      ${topRows.length ? `<div class="table-wrap"><table class="data dashboard-risk-table" style="margin:-1px 0">
         <thead><tr><th>Order</th><th>Supplier</th><th>Risk</th><th>Reason</th></tr></thead>
         <tbody>${topRows.map(r => `<tr onclick="openOrderDetail('${r.order.id}')">
           <td><span class="mono">${escapeHtml(r.order.orderId || '—')}</span></td>
-          <td class="truncate">${escapeHtml(r.order.supplier || '—')}</td>
+          <td class="dashboard-risk-supplier" title="${escapeHtml(r.order.supplier || '')}">${escapeHtml(r.order.supplier || '—')}</td>
           <td><span class="badge ${r.risk.cls}">${escapeHtml(r.risk.level)} ${r.risk.score}</span></td>
-          <td class="text-xs truncate" title="${escapeHtml(r.risk.reasons[0] || '')}">${escapeHtml(r.risk.reasons[0] || '—')}</td>
+          <td class="dashboard-risk-reason text-xs" title="${escapeHtml(r.risk.reasons[0] || '')}">${escapeHtml(r.risk.reasons[0] || '—')}</td>
         </tr>`).join('')}</tbody>
       </table></div>` : '<div class="text-muted text-sm">No elevated procurement risk detected.</div>'}
     `;
