@@ -22,7 +22,7 @@ Current ERP/integration posture:
 - Phoenix is expected to move to Business Central later.
 - The approved future integration path is ERP -> Data Warehouse/staging -> controlled sync/API service -> Phoenix Procurement. The browser must not connect directly to Navision, Business Central, or the Data Warehouse.
 
-Important continuity note: this folder is not currently a Git repository. `git status` and `git log` fail with "not a git repository". The current continuity baseline is therefore the working folder plus the timestamped zip backups. This should be corrected before substantial new development.
+Important continuity note: this folder is now a Git repository. The starting handover state was committed as `8b0618d` and tagged `baseline-2026-07-06` before follow-up fixes were made. Timestamped zip backups are still present in the folder for release/reference history.
 
 ## Completed modules and features
 
@@ -155,12 +155,10 @@ Authentication and access:
 - Production Firebase project, hardened rules, API-key restrictions, and HTTPS hosting.
 - Automated end-to-end browser regression suite.
 - Formal unit tests for import classification, permissions, data quality, and My Work computed actions.
-- Git-based source control and release tagging.
 - Server-side audit/reporting pipeline, if required by IT.
 
 ## Current known bugs and limitations
 
-- No Git repository is present. This is the largest continuity risk.
 - No `package.json`, npm test, lint, or TypeScript configuration exists. Current validation is Python build, generated data dictionary check, structural invariant checks, and Node syntax checks.
 - Browser/client-side permission checks are not sufficient for production security. Firestore rules and authenticated identity must enforce access server-side before go-live.
 - Demo mode still contains demo aids such as role switching and guarded demo purge. These must stay disabled in production builds.
@@ -171,11 +169,10 @@ Authentication and access:
 
 ## Immediate next development priorities
 
-1. Put `F:\OneDrive\Documents\PP2` under Git and commit the current clean source, docs, dist file, and packaging scripts before new feature work.
-2. Repeat a visual smoke test of dashboard, entity switching, filter pane, order detail, shipment detail, payment permissions, and production login mode.
-3. Re-test access rules for view-only users, especially payment request creation and update request visibility.
-4. Create automated checks for permission-sensitive actions and My Work disappearing-after-processed logic.
-5. Decide the next delivery tranche: either SharePoint adapter design, Data Warehouse/API design, or operational feature polishing. Do not mix these without a milestone boundary.
+1. Repeat a visual smoke test of dashboard, entity switching, filter pane, order detail, shipment detail, Exports/Outbound, KPI Trends capture/backfill, payment permissions, and production login mode.
+2. Re-test access rules for view-only users, especially payment request creation, exports, KPI capture, and update request visibility.
+3. Create automated checks for permission-sensitive actions and My Work disappearing-after-processed logic.
+4. Decide the next delivery tranche: either SharePoint adapter design, Data Warehouse/API design, or operational feature polishing. Do not mix these without a milestone boundary.
 
 ## Current validation baseline
 

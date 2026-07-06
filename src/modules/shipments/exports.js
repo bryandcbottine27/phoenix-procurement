@@ -266,7 +266,7 @@
   window.__archiveExport = async function (id) {
     if (!U.can('exports', 'archive')) { U.toast('Not authorised to archive exports.', 'warn'); return; }
     if (!confirm('Archive this export record? It will be hidden from the list.')) return;
-    try { await window.PXStore.updateRecord('exports', id, { archived: true, updatedAt: new Date().toISOString() }, { skipValidation: true }); U.toast('Export archived', 'success'); window.closeModal(); }
+    try { await window.PXStore.archiveRecord('exports', id, 'Archived from Exports / Outbound'); U.toast('Export archived', 'success'); window.closeModal(); }
     catch (e) { U.toast('Archive failed: ' + (e.message || e), 'danger'); }
   };
 

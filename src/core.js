@@ -2318,7 +2318,7 @@ window.PXUtils = {
   orderFunction, functionForCategory, orderNeedsShipment,
   // permission helpers
   canEditOrders, canEditShipments, canManageShipments, canReassignOrders,
-  can, currentRole,
+  can, currentRole, isPrivileged,
   currentEntity, setCurrentEntity, entityMeta, recordEntity,
   // generic column manager
   cmGetColumns, cmRenderTable, cmOpenManager, cmExportCSV,

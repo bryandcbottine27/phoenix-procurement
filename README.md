@@ -207,8 +207,8 @@ and (if it has a badge) set `#count-<view>` in `updateCounts()`.
 - **No hard deletes of business records in normal use** — use `archiveRecord` (soft
   delete, audit-safe). The **one** sanctioned hard-delete is the demo-only "Clear all
   data" purge in `modules/reports/erpImport.js`, gated behind `REF.demoResetEnabled`
-  (default **false**), admin-only, and a required Backup All. It must stay disabled (or
-  be removed) before pilot/production.
+  (enabled only for isolated demo reset testing), admin-only, and a required Backup All.
+  It must stay disabled (or be removed) before pilot/production.
 - **Documents** can be attached two ways: a SharePoint/OneDrive **link** (recommended —
   files stay governed in M365) or a small **demo file upload** (base64 in Firestore,
   ≤600 KB). The app now stores SharePoint-ready folder metadata through `PXDocuments`;

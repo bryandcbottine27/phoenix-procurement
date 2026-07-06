@@ -272,7 +272,7 @@
       fullName:       F('Full name', 'string', 'Phoenix', true, true, 'lists, forms'),
       email:          F('Individual login email/username used to link the authenticated user to this officer profile', 'string', 'Phoenix', true, false, 'Officers & Roles, login mapping'),
       authUid:        F('Firebase Auth / SSO user id for direct officer-profile lookup', 'string', 'Phoenix', true, false, 'Officers & Roles, login mapping'),
-      role:           F('admin or one of the 10 organisational roles: procurement_senior_manager, procurement_manager, procurement_supervisor, procurement_officer, logistics_manager, logistics_officer, demand_supervisor, demand_officer, finance, stakeholder', 'string', 'Phoenix', true, false, 'permissions'),
+      role:           F('admin or one of the current stream-specific roles: procurement_senior_manager, sc_manager, sc_supervisor, sc_officer, procurement_technical_manager, procurement_technical_supervisor, procurement_technical_officer, procurement_indirect_manager, procurement_indirect_supervisor, procurement_indirect_officer, logistics_manager, logistics_officer, demand_supervisor, demand_officer, finance, stakeholder', 'string', 'Phoenix', true, false, 'permissions'),
       function:       F('technical / indirect / supplychain', 'string', 'Phoenix', true, false, 'assignment'),
       active:         F('Active flag', 'bool', 'Phoenix', true, false, 'lists'),
       delegateToCode: F('Inc.5d: officer code to delegate My Work items to (set during absence)', 'string', 'Phoenix', true, false, 'delegation'),

@@ -130,9 +130,9 @@ Set up by `core.js`, consumed everywhere:
 
 **All creates/updates/archives go through `window.PXStore`** (now in its own `firestoreStore.js`). No module calls `addDoc`/`updateDoc`/`setDoc`/`deleteDoc` directly. **There are no hard deletes of business records** — removal is soft `archiveRecord` (reversible via `restoreRecord`). The only direct Firestore primitive left outside PXStore is the atomic per-entity RFP-counter `runTransaction`. **PXStore is validation-aware**: it runs `PXValidators` before create/update (errors block, warnings logged), so validation is inherited even if a form forgets to call it.
 
-**PXStore also enforces role write permissions.** Create/update/archive/restore now check `REF.permissions` before writing business collections: `orders`, `shipments`, `payment_requests`, `suppliers`, `documents`, `followups`, `issues`, `updateRequests`, and `officers`. This is the safety net behind the UI: a view-only role may still open detail screens, but hidden buttons, stale onclicks, or console calls cannot write through PXStore. Controlled side-effect writes use explicit `permissionResource` / `permissionAction` options, e.g. ERP import may update order ERP fields under `erprecon`, supplier mapping may stamp `supplierId` on orders under `suppliers`, and procurement may create a shipment request under `orders:edit` without being allowed to edit logistics details.
+**PXStore also enforces role write permissions.** Create/update/archive/restore now check `REF.permissions` before writing business collections: `orders`, `shipments`, `exports`, `payment_requests`, `suppliers`, `documents`, `followups`, `issues`, `updateRequests`, and `officers`. This is the safety net behind the UI: a view-only role may still open detail screens, but hidden buttons, stale onclicks, or console calls cannot write through PXStore. Controlled side-effect writes use explicit `permissionResource` / `permissionAction` options, e.g. ERP import may update order ERP fields under `erprecon`, supplier mapping may stamp `supplierId` on orders under `suppliers`, and procurement may create a shipment request under `orders:edit` without being allowed to edit logistics details. KPI snapshot writes are limited to the privileged tier through `PXUtils.isPrivileged()`.
 
-> **One sanctioned exception — profile/bootstrap, not a business write.** During sign-in, `core.js` writes the current user's *own* officer profile directly via `setDoc(doc(db,'officers',uid))` / `updateDoc`, because the document ID must equal the Auth UID (PXStore uses auto-IDs) and it runs during identity bootstrap before state is ready. This is identity setup, not a CRUD operation on business data, and it is the only place a direct write is allowed. It will be replaced when real authentication is added. All business records (orders, shipments, payment_requests, suppliers, documents, followups, issues) still go through PXStore exclusively.
+> **One sanctioned exception — profile/bootstrap, not a business write.** During sign-in, `core.js` writes the current user's *own* officer profile directly via `setDoc(doc(db,'officers',uid))` / `updateDoc`, because the document ID must equal the Auth UID (PXStore uses auto-IDs) and it runs during identity bootstrap before state is ready. This is identity setup, not a CRUD operation on business data, and it is the only place a direct write is allowed. It will be replaced when real authentication is added. All business records (orders, shipments, exports, payment_requests, suppliers, documents, followups, issues, updateRequests, and contactLog) still go through PXStore exclusively.
 
 ```js
 PXStore.createRecord(collection, data, opts?)    // + createdAt/By, updatedAt/By, stripUndefined, optional log
@@ -227,10 +227,15 @@ Allowed status transitions per record type (`shipment`, `payment`, `document`, `
 
 Base resource/action matrix lives in `REF.permissions`; the engine is `PXUtils.can(resource, action)`. `PXPermissions.can(action, record, user?)` adds record-aware rules (e.g. cannot edit a closed order unless admin; cannot edit ERP-locked fields). **UI-layer only** for now — same matrix is intended to drive Firestore security rules once real login is added.
 
-Roles: `admin` (full) plus the 10 organisational roles in `REF.permissions` / `REF.viewAccess`:
-`procurement_senior_manager`, `procurement_manager`, `procurement_supervisor`,
-`procurement_officer`, `logistics_manager`, `logistics_officer`, `demand_supervisor`,
-`demand_officer`, `finance`, `stakeholder`. Legacy values are normalized by `normalizeRole()`.
+Roles: `admin` (full) plus the stream-specific roles in `REF.permissions` / `REF.viewAccess`:
+`procurement_senior_manager`, `sc_manager`, `sc_supervisor`, `sc_officer`,
+`procurement_technical_manager`, `procurement_technical_supervisor`,
+`procurement_technical_officer`, `procurement_indirect_manager`,
+`procurement_indirect_supervisor`, `procurement_indirect_officer`,
+`logistics_manager`, `logistics_officer`, `demand_supervisor`,
+`demand_officer`, `finance`, `stakeholder`. Legacy generic values such as
+`procurement_manager`, `procurement_supervisor`, `procurement_officer`,
+`logistics_supervisor`, `accounts`, and `officer` are normalized by `normalizeRole()`.
 
 ---
 
@@ -408,8 +413,8 @@ Seybrew 415), matching the spec rules.
 
 The ERP Reconciliation view has a **Danger Zone → Clear all data** action
 (`window.__purgeAllData` in `erpImport.js`). It HARD-deletes every business record
-across **all entities** — orders, shipments, payment_requests, suppliers, documents,
-followups, issues, status_log — and **keeps officers/roles and system_config** so
+across **all entities** — orders, shipments, exports, payment_requests, suppliers, documents,
+followups, issues, updateRequests, contactLog, kpiSnapshot, and status_log — and **keeps officers/roles and system_config** so
 logins/teams survive. Requires typing **DELETE ALL**, shows a count first, batched
 with progress + stop. This is the ONLY sanctioned hard delete in the app; it is kept
 out of PXStore deliberately (PXStore stays delete-free — removal there is soft archive).
@@ -746,8 +751,8 @@ records are a controlled exception: `Currency Code` corrects local/foreign, whil
 - **Preserve Phoenix data on update:** updates patch only `ERP_OWNED_UPDATE_FIELDS`; status,
   milestones, noShipment, stagedPayment, notes, follow-ups, etc. are never touched.
 
-**4. Demo reset safeguard.** `REF.demoResetEnabled` (default **false**). The "Clear all data"
-Danger Zone renders only when `demoResetEnabled && currentRole()==='admin'`. The purge requires
+**4. Demo reset safeguard.** `REF.demoResetEnabled` is only for isolated demo reset testing. The "Clear all data"
+Danger Zone renders only when demo mode is active, `demoResetEnabled` is true, and `currentRole()==='admin'`. The purge requires
 a successful **Backup All** in the session (`window.__backupDoneAt`, set by the JSON/CSV backup)
 — the panel shows a "Run Backup All now" button and keeps the **Permanently delete** button
 disabled until both the backup is done and `DELETE ALL` is typed. Must be left disabled (or the
@@ -1075,13 +1080,13 @@ escaping, grid + empty state).
 
 Documents, follow-ups, and issues use **soft archive**, never hard delete: `archived`, `archivedAt`, `archivedBy`, `archiveReason`. Each section has a **"Show archived (n)"** toggle and a **Restore** button on archived rows. Archived records are hidden by default, excluded from counts/reports, but kept for audit and included in backups.
 
-Business records (orders, shipments, payment_requests, suppliers) are likewise removed by
+Business records (orders, shipments, exports, payment_requests, suppliers) are likewise removed by
 **soft archive only** in normal use — the "Archive" button on each form calls
 `PXStore.archiveRecord`, and the list views hide archived rows.
 
 **One sanctioned exception:** the demo-only "Clear all data" purge in
 `modules/reports/erpImport.js` hard-deletes business records to reset an isolated demo
-database. It is gated behind `REF.demoResetEnabled` (default **false**), shown only to
+database. It is gated behind demo mode plus `REF.demoResetEnabled`, shown only to
 admins, requires a successful **Backup All** first, and keeps the typed `DELETE ALL`
 confirmation. It must be disabled (or removed) before any pilot/production use. `PXStore`
 itself remains delete-free by design — the purge calls `deleteDoc` directly and is the only
@@ -1402,12 +1407,10 @@ entities because the order and shipment screens are already scoped by `currentEn
 
 **Access rules.** `PXUpdateRequests.canRequestUpdate(targetType)` is the single gate for the button.
 For Foreign/Local order sections it allows Internal Stakeholder, Procurement Manager/Supervisor,
-and Logistics Manager/Supervisor. For Logistics Operations > Shipments it allows Internal Stakeholder,
-Procurement Manager/Supervisor/Officer, and Logistics Manager/Supervisor/Officer. The current demo
-still has broad `procurement` and `logistics` roles, so those broad roles are temporarily accepted
-until the organisation moves fully to granular role codes (`procurement_manager`,
-`procurement_supervisor`, `procurement_officer`, `logistics_manager`, `logistics_supervisor`,
-`logistics_officer`, `stakeholder`). The gate also checks section access through
+and Logistics Manager/Supervisor-style roles where the user has section access. For Logistics
+Operations > Shipments it also allows Procurement Officer and Logistics Officer roles. Legacy
+generic procurement/logistics role values are normalized to current stream-specific role codes before
+permission checks run. The gate also checks section access through
 `can('orders','view')`, `can('shipments','view')`, and `can('updateRequests','create')`.
 
 **Request For Update.** The modal shows which officers will be notified and takes a free-text
@@ -1750,7 +1753,7 @@ is per-browser and never written to the Firestore officer record, so other sessi
 are untouched.
 
 UI: the header user-chip is clickable (`__openRoleSwitcher`) and lists Superuser (admin) plus the
-10 organisational roles. Picking one
+configured stream-specific test roles. Picking one
 calls `__setDemoRole(code)`, which persists the override, refreshes the chip (a dashed outline + role
 pill marks demo mode), re-applies `applyNavVisibility()`, toggles the role-gated "+ New Order" button,
 and re-renders the current view. Choosing "Superuser (admin)" clears the override. On boot,
@@ -1820,12 +1823,17 @@ The app's access model has TWO layers, both generated from the approved Excel ac
    hides nav items and empty sections; the navigate() guard redirects away from hidden views. Anything
    not listed = full.
 
-**The 10 organizational roles** (+ admin): procurement_senior_manager, procurement_manager,
-procurement_supervisor, procurement_officer, logistics_manager, logistics_officer, demand_supervisor,
-demand_officer, finance, stakeholder. Legacy values are normalized (`normalizeRole()`):
-accounts->finance, bare procurement->procurement_manager, bare logistics->logistics_manager,
-officer->procurement_officer, logistics_supervisor->logistics_officer — so existing officer records
-keep working.
+**The current stream-specific roles** (+ admin): procurement_senior_manager, sc_manager,
+sc_supervisor, sc_officer, procurement_technical_manager,
+procurement_technical_supervisor, procurement_technical_officer,
+procurement_indirect_manager, procurement_indirect_supervisor,
+procurement_indirect_officer, logistics_manager, logistics_officer,
+demand_supervisor, demand_officer, finance, stakeholder. Legacy values are normalized
+(`normalizeRole()`): accounts->finance, bare procurement->procurement_technical_manager,
+generic procurement manager/supervisor/officer values -> the Technical stream by default,
+bare logistics->logistics_manager, logistics_supervisor->logistics_officer,
+officer->procurement_technical_officer — so existing officer records keep working while
+they are reassigned to their correct stream.
 
 **Consistency rule:** where a role is `viewOnly` on a screen-backed resource, its action permissions
 for that resource are capped at `['view']`, so the two layers never contradict (no edit buttons on a
@@ -1834,8 +1842,8 @@ view-only on orders/shipments/payments/documents, but retains updateRequests cre
 can *request* changes without making them directly. Logistics manager/officer retain documents edit by
 explicit decision.
 
-To change access: edit the grid, regenerate the two REF blocks, rebuild. The officer-form dropdown and
-the demo role switcher both list the final 10 roles.
+To change access: edit the grid/source roles, regenerate the two REF blocks, rebuild. The officer-form
+dropdown and the demo role switcher both list the configured roles.
 
 ---
 
@@ -1903,7 +1911,7 @@ Before building, answer these (this keeps the app from sprawling):
 - Documents support two methods: a SharePoint/OneDrive **link** (recommended) and a
   small **demo file upload** (base64 in Firestore, ≤600 KB). Binary storage at scale
   (Firebase Storage / SharePoint document library via Graph API) is future work.
-- Hard deletes exist in exactly one place: the demo-only purge (see §12), default-disabled.
+- Hard deletes exist in exactly one place: the demo-only purge (see §12), which must be disabled before pilot/production data is used.
 - ERP/Data Warehouse integration is placeholder only — no live Navision/BC, Data Warehouse, or direct browser calls; the maps and adapters define the future controlled sync contract.
 - Working-day calculations exclude weekends and the approved holiday dates maintained in System
   Settings → Working Calendars; there is no automatic public-holiday feed.

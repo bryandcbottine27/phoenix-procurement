@@ -85,10 +85,8 @@ supports both; choose one:
 - Register the app in **Azure AD** (app registration; redirect URI = your server URL).
 - Wire Firebase Auth to the Microsoft identity provider (Firebase supports OIDC/SAML), or use MSAL to obtain
   the identity and exchange it for a Firebase custom token via a small Cloud Function.
-- On sign-in, set the user's **role** (`admin` or one of the 10 organisational role codes:
-  `procurement_senior_manager`, `procurement_manager`, `procurement_supervisor`,
-  `procurement_officer`, `logistics_manager`, `logistics_officer`, `demand_supervisor`,
-  `demand_officer`, `finance`, `stakeholder`) as a custom
+- On sign-in, set the user's **role** (`admin` or one of the stream-specific role codes listed in
+  `docs/ACCESS_GRID.md`) as a custom
   claim or in their `officers` record. The app reads `state.officer.role` — populate it from the verified
   identity instead of the prototype's self-set profile.
 - Apply `firestore.rules.authenticated`.
@@ -148,7 +146,7 @@ When every box is ticked, the app is ready for users. Until then, it is not.
 ## 8. What remains the business's / vendor's responsibility, not IT's
 
 - Final sign-off on the **auth model** (Path A vs B) and acceptance of any interim risk.
-- Ongoing **role administration** (who holds each of the 10 organisational roles, plus `admin`).
+- Ongoing **role administration** (who holds each stream-specific role, plus `admin`).
 - The eventual **live ERP integration** (Navision → Business Central), which is out of scope for this build —
   the app currently ingests ERP data by import, not live sync.
 

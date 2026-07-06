@@ -32,6 +32,7 @@
     documents: 'documents',
     followups: 'followups',
     issues: 'issues',
+    exports: 'exports',
     updateRequests: 'updateRequests',
     officers: 'officers'
   };

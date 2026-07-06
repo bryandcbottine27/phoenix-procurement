@@ -32,8 +32,27 @@ service cloud.firestore {
     }
     function isAdmin()       { return myRole() == 'admin'; }
     function isProcurement() {
-      return myRole() in ['procurement_senior_manager', 'procurement_manager',
-                          'procurement_supervisor', 'procurement_officer'] || isAdmin();
+      return myRole() in [
+        'procurement_senior_manager',
+        'sc_manager', 'sc_supervisor', 'sc_officer',
+        'procurement_technical_manager', 'procurement_technical_supervisor', 'procurement_technical_officer',
+        'procurement_indirect_manager', 'procurement_indirect_supervisor', 'procurement_indirect_officer'
+      ] || isAdmin();
+    }
+    function isProcurementManager() {
+      return myRole() in [
+        'procurement_senior_manager',
+        'sc_manager',
+        'procurement_technical_manager',
+        'procurement_indirect_manager'
+      ] || isAdmin();
+    }
+    function isProcurementOperator() {
+      return myRole() in [
+        'sc_supervisor', 'sc_officer',
+        'procurement_technical_supervisor', 'procurement_technical_officer',
+        'procurement_indirect_supervisor', 'procurement_indirect_officer'
+      ] || isAdmin();
     }
     function isLogistics() {
       return myRole() in ['logistics_manager', 'logistics_officer'] || isAdmin();
@@ -44,8 +63,24 @@ service cloud.firestore {
     function isDemandPlanning() {
       return myRole() in ['demand_supervisor', 'demand_officer'] || isAdmin();
     }
+    function isPrivileged() {
+      return myRole() in [
+        'admin',
+        'procurement_senior_manager',
+        'sc_manager', 'sc_supervisor',
+        'procurement_technical_manager', 'procurement_technical_supervisor',
+        'procurement_indirect_manager', 'procurement_indirect_supervisor',
+        'logistics_manager',
+        'demand_supervisor'
+      ];
+    }
+    function canWriteShipments() {
+      return isLogistics()
+             || myRole() in ['sc_manager', 'procurement_technical_manager', 'procurement_indirect_manager']
+             || isAdmin();
+    }
     function canWritePayments() {
-      return myRole() in ['procurement_supervisor', 'procurement_officer'] || isAdmin();
+      return isProcurementOperator() || isAdmin();
     }
 
     // ---- default: deny everything not explicitly allowed -------------------
@@ -71,8 +106,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // ---- shipments: logistics creates/edits --------------------------------
+    // ---- shipments: logistics creates/edits; stream managers have oversight writes
     match /shipments/{id} {
+      allow read:   if signedIn();
+      allow create, update: if canWriteShipments();
+      allow delete: if isAdmin();
+    }
+
+    // ---- exports: outbound movement is logistics-owned ---------------------
+    match /exports/{id} {
       allow read:   if signedIn();
       allow create, update: if isLogistics();
       allow delete: if isAdmin();
@@ -101,8 +143,8 @@ service cloud.firestore {
     match /updateRequests/{id} { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
     match /contactLog/{id}     { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
 
-    // ---- kpiSnapshot: any signed-in user may capture; admin may delete -----
-    match /kpiSnapshot/{id}    { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+    // ---- kpiSnapshot: privileged users capture/backfill; admin may delete ---
+    match /kpiSnapshot/{id}    { allow read: if signedIn(); allow create, update: if isPrivileged(); allow delete: if isAdmin(); }
 
     // ---- status_log: APPEND-ONLY audit trail -------------------------------
     // Anyone signed-in may add an entry; nobody may modify or delete one.

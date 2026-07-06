@@ -6,7 +6,7 @@ This roadmap organizes remaining work into milestones. It assumes the current mo
 
 ## Milestone 0 - Continuity and release hygiene
 
-Status: immediate priority.
+Status: initial baseline completed on 2026-07-06; keep release hygiene ongoing.
 
 Goal:
 
@@ -19,9 +19,9 @@ Dependencies:
 
 Scope:
 
-- Initialize Git in `F:\OneDrive\Documents\PP2`.
-- Commit current source, docs, dist file, build tools, and package notes.
-- Tag the current handover baseline.
+- Git has been initialized in `F:\OneDrive\Documents\PP2`.
+- The starting source, docs, dist file, build tools, package notes, and existing zip backups were committed as the baseline.
+- The baseline was tagged as `baseline-2026-07-06`.
 - Keep `AGENTS.md`, `PROJECT_STATE.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `ROADMAP.md`, and `BUSINESS_RULES.md` updated.
 
 Acceptance criteria:

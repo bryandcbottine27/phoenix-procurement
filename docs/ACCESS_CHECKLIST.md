@@ -7,9 +7,10 @@ I'll then apply the access changes precisely.
 
 Legend you can use when marking up: write the roles allowed next to each line, e.g.
 `[ ] Shipments — logistics, admin (procurement view-only)`.
-Roles available: **admin**, plus **procurement_senior_manager, procurement_manager,
-procurement_supervisor, procurement_officer, logistics_manager, logistics_officer,
-demand_supervisor, demand_officer, finance, stakeholder**.
+Roles available: **admin**, plus the stream-specific roles listed in
+`docs/ACCESS_GRID.md`: Senior Procurement Manager; Supply Chain Manager/Supervisor/Officer;
+Procurement Technical Manager/Supervisor/Officer; Procurement Indirect Manager/Supervisor/Officer;
+Logistics Manager/Officer; Demand Planning Supervisor/Officer; Finance; Stakeholder.
 
 ---
 
