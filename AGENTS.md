@@ -44,6 +44,17 @@ If the change touches fields or collections, read and update `src/schema.js`. Do
 - Keep UI dense, operational, and suitable for repeated daily use.
 - Changes must apply to Phoenix, Seychelles Breweries, and Edena unless explicitly documented otherwise.
 
+## Package file rule
+
+- The project root must contain exactly two zip packages:
+  - `Phoenix Procurement DEMO FULL.zip`
+  - `Phoenix Procurement PRODUCTION FULL.zip`
+- Do not create timestamped, `pre-*`, backup, duplicate-purpose, or extra package zip files in the project root.
+- Every package update/amendment must replace those two files only.
+- Demo package keeps the demo build (`dist/phoenix-procurement-DEMO.html`).
+- Production package keeps the production build (`dist/phoenix-procurement-PRODUCTION.html`) with `demoMode: false` and `authMode: 'password'`.
+- Use Git commits/tags for history instead of accumulating package backup zips.
+
 ## Data and write rules
 
 - All business record writes must go through `window.PXStore`.
@@ -118,6 +129,6 @@ This currently performs:
 
 There is currently no `package.json`, lint runner, TypeScript checker, unit test suite, migration runner, or Firebase rules validation command in the repo. If you add any of these, update this file and `docs/PROJECT_STATE.md`.
 
-## Current continuity risk
+## Current continuity note
 
-This project folder is not currently a Git repository. Before major new feature work, initialize Git, commit the current clean baseline, and tag it.
+This project folder is now a Git repository. The original handover baseline is tagged `baseline-2026-07-06`. Keep the working tree clean after handover, commit meaningful changes, and keep only the two current package zips listed above.

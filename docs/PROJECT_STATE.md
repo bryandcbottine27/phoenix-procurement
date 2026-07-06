@@ -22,7 +22,7 @@ Current ERP/integration posture:
 - Phoenix is expected to move to Business Central later.
 - The approved future integration path is ERP -> Data Warehouse/staging -> controlled sync/API service -> Phoenix Procurement. The browser must not connect directly to Navision, Business Central, or the Data Warehouse.
 
-Important continuity note: this folder is now a Git repository. The starting handover state was committed as `8b0618d` and tagged `baseline-2026-07-06` before follow-up fixes were made. Timestamped zip backups are still present in the folder for release/reference history.
+Important continuity note: this folder is now a Git repository. The starting handover state was committed as `8b0618d` and tagged `baseline-2026-07-06` before follow-up fixes were made. Package history should be kept in Git, not by accumulating timestamped zip backups. The project root should contain only the two current package files: `Phoenix Procurement DEMO FULL.zip` and `Phoenix Procurement PRODUCTION FULL.zip`.
 
 ## Completed modules and features
 
@@ -187,7 +187,8 @@ Last local validation during this handover pass:
 - Demo and production zip packages refreshed with these handover docs included:
   - `Phoenix Procurement DEMO FULL.zip`
   - `Phoenix Procurement PRODUCTION FULL.zip`
-- The refreshed demo package contains only `dist/phoenix-procurement-DEMO.html`.
-- The refreshed production package contains only `dist/phoenix-procurement-PRODUCTION.html`.
+- The refreshed demo package includes source/docs/tools plus only `dist/phoenix-procurement-DEMO.html` under `dist`.
+- The refreshed production package includes source/docs/tools plus only `dist/phoenix-procurement-PRODUCTION.html` under `dist`.
+- No timestamped or `pre-*` package zip files should be kept in the project root.
 
 No separate lint, type check, unit test, migration, or Firebase rules validation command exists in the repository at this time.

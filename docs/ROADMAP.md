@@ -15,12 +15,13 @@ Create a stable development baseline before more features are added.
 Dependencies:
 
 - Current source folder.
-- Current demo and production zip backups.
+- Current demo and production package zips.
 
 Scope:
 
 - Git has been initialized in `F:\OneDrive\Documents\PP2`.
 - The starting source, docs, dist file, build tools, package notes, and existing zip backups were committed as the baseline.
+- Current packaging policy keeps only `Phoenix Procurement DEMO FULL.zip` and `Phoenix Procurement PRODUCTION FULL.zip` in the project root; old timestamped package zips have been removed.
 - The baseline was tagged as `baseline-2026-07-06`.
 - Keep `AGENTS.md`, `PROJECT_STATE.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `ROADMAP.md`, and `BUSINESS_RULES.md` updated.
 
@@ -28,7 +29,7 @@ Acceptance criteria:
 
 - `git status` shows a clean working tree after the baseline commit.
 - Current docs are committed.
-- Current zips are either committed intentionally or excluded with a documented backup policy.
+- Only the two current package zips exist in the project root.
 - `python build.py` passes.
 
 Validation:

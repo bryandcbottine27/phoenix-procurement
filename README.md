@@ -53,6 +53,11 @@ python -m http.server 8000      # then open http://localhost:8000/index.html
 (the single generated demo file) — regenerated on every build with identical
 content and work on `file://` / OneDrive, no server needed.
 
+**Package zips:** keep only two package files in the project root:
+`Phoenix Procurement DEMO FULL.zip` and `Phoenix Procurement PRODUCTION FULL.zip`.
+When packaging is refreshed, replace those two files only. Do not add timestamped or
+`pre-*` backup zips; Git commits/tags are the release history.
+
 ---
 
 ## Interface theme
