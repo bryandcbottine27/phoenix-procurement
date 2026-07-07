@@ -65,22 +65,19 @@
     return u.recordEntity ? u.recordEntity(order || {}) : (order?.entity || 'Phoenix');
   }
 
+  // Single ageing definition across the app: always use the shared working-day
+  // helpers (weekend/holiday aware, defined in dataQuality.js and exposed on PXUtils).
+  // If they are somehow unavailable (module load failure) we return null ("unknown")
+  // rather than a raw calendar-day count that would silently disagree with every other
+  // ageing figure — all callers already treat null as "skip this check".
   function workingSince(value, entity) {
     const u = px();
-    if (u.workingDaysSince) return u.workingDaysSince(value, entity);
-    const d = dateStart(value);
-    if (!d) return null;
-    const today = dateStart(new Date());
-    return Math.round((today - d) / 86400000);
+    return u.workingDaysSince ? u.workingDaysSince(value, entity) : null;
   }
 
   function workingUntil(value, entity) {
     const u = px();
-    if (u.workingDaysUntil) return u.workingDaysUntil(value, entity);
-    const d = dateStart(value);
-    if (!d) return null;
-    const today = dateStart(new Date());
-    return Math.round((d - today) / 86400000);
+    return u.workingDaysUntil ? u.workingDaysUntil(value, entity) : null;
   }
 
   function isClosed(order) {
@@ -116,7 +113,14 @@
        (i.relatedType === 'shipment' && ships.has(i.relatedId))));
   }
 
+  // Single source of truth for "does this receipt count as a GRN?" is
+  // window.PXReceiptControl.grnCountsAsReceipt (orders.service.js). This module
+  // loads BEFORE orders.service.js, so we must delegate at CALL time (renders
+  // happen long after all modules load), never at module-load time. The inline
+  // branch is a load-order safety net only and must mirror the canonical rule.
   function grnCountsAsReceipt(receipt) {
+    const rc = window.PXReceiptControl;
+    if (rc && typeof rc.grnCountsAsReceipt === 'function') return rc.grnCountsAsReceipt(receipt);
     const status = String(receipt?.status || '').toLowerCase();
     return status !== 'pending' && status !== 'cancelled' && !!(receipt?.grnDate || receipt?.actualReceiptDate || receipt?.grnRef || receipt?.grnNumber);
   }

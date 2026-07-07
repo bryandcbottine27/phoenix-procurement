@@ -89,7 +89,13 @@
   function latestDate(values) {
     return values.map(asDate).filter(Boolean).sort((a, b) => b - a)[0] || null;
   }
+  // Delegate to the single source of truth (window.PXReceiptControl.grnCountsAsReceipt
+  // in orders.service.js). This module loads before orders.service.js, so we resolve
+  // at CALL time (all callers run during render, after every module has loaded). The
+  // inline branch is a load-order safety net only and must mirror the canonical rule.
   function grnCountsAsReceipt(receipt) {
+    const rc = window.PXReceiptControl;
+    if (rc && typeof rc.grnCountsAsReceipt === 'function') return rc.grnCountsAsReceipt(receipt);
     const status = String(receipt?.status || '').toLowerCase();
     return status !== 'pending' && status !== 'cancelled' && !!(receipt?.grnDate || receipt?.actualReceiptDate || receipt?.grnRef || receipt?.grnNumber);
   }
@@ -154,6 +160,25 @@
     const readyAge = workingDaysSince(order.orderReadyDate, entity);
     if (!order.isClosed && isForeignGoods && order.orderReadyDate && activeShipments.length === 0 && readyAge !== null && readyAge > DQ.readyNoShipmentWorkingDays) {
       issues.push({ key: 'order-ready-no-shipment', level: 'warn', msg: 'Goods are ready but no active shipment has been created.' });
+    }
+
+    // Orphaned GRN links: a receipt row points to a shipmentId that no longer matches
+    // any shipment record (the shipment was hard-deleted, or the id was edited). Such a
+    // GRN silently drops out of shipment receipt/OTIF tracking, so surface it for a human
+    // to relink or clear the reference rather than letting it disappear unnoticed.
+    // Only run when a shipments context was actually supplied (Array, even if empty) —
+    // callers that omit it entirely (e.g. a lightweight scorecard call) would otherwise
+    // false-flag every linked receipt as orphaned.
+    if (Array.isArray(ctx.shipments)) {
+      const knownShipmentIds = new Set();
+      ctx.shipments.forEach(shipment => {
+        if (shipment.id != null) knownShipmentIds.add(String(shipment.id));
+        if (shipment.shipmentId) knownShipmentIds.add(String(shipment.shipmentId));
+      });
+      const orphanReceipts = (order.receipts || []).filter(receipt => receipt && receipt.shipmentId && !knownShipmentIds.has(String(receipt.shipmentId)));
+      if (orphanReceipts.length) {
+        issues.push({ key: 'order-grn-orphan-shipment-link', level: 'warn', msg: `${orphanReceipts.length} GRN receipt row(s) reference a shipment that no longer exists — relink the GRN or clear its shipment reference.` });
+      }
     }
 
     if (!order.isClosed && order.orderSentToSupplierDate) {

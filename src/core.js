@@ -1054,12 +1054,15 @@ function shipmentStatusOptionsHtml(currentValue) {
 
 function nextShipmentSequence(orderId, shipments = state.data.shipments) {
   if (!orderId) return 1;
-  const related = (shipments || []).filter(sh => sh && sh.orderId === orderId);
-  const maxSeq = related.reduce((max, sh) => {
-    const match = String(sh.shipmentId || "").match(/\(S(\d+)\)\s*$/i);
-    return match ? Math.max(max, Number(match[1]) || 0) : max;
-  }, 0);
-  return Math.max(maxSeq, related.length) + 1;
+  // Base the next number purely on the HIGHEST existing sequence, parsed from the
+  // shipment IDs themselves via shipmentSequence() (handles both "(S#)" and legacy
+  // single-letter suffixes). We deliberately do NOT floor on related.length: a raw
+  // count desyncs from the real max when a shipment is archived/restored or an ID is
+  // hand-edited, which could skip or duplicate a number. Archived shipments are
+  // excluded so a restored one keeps its original sequence instead of forcing a gap.
+  const related = (shipments || []).filter(sh => sh && sh.orderId === orderId && !sh.archived);
+  const maxSeq = related.reduce((max, sh) => Math.max(max, shipmentSequence(sh) || 0), 0);
+  return maxSeq + 1;
 }
 
 function makeShipmentSequenceId(orderId, shipments = state.data.shipments) {

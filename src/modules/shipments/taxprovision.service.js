@@ -156,8 +156,11 @@ function buildTaxProvisionXLSX(opts) {
     { name: 'xl/_rels/workbook.xml.rels', data: wbRels },
     { name: 'xl/worksheets/sheet1.xml', data: sheet }
   ];
+  // Reuses the dependency-free zip writer from payments.service.js. Build load order
+  // guarantees it is present; this guard degrades gracefully (the caller catches and
+  // toasts) instead of throwing a raw TypeError if that ever changes.
   const zip = window.__pay_zipStored;
-  if (!zip) throw new Error('XLSX writer unavailable');
+  if (typeof zip !== 'function') throw new Error('Excel writer is unavailable — reload the page and try the export again.');
   return zip(files);
 }
 window.__teps_buildXLSX = buildTaxProvisionXLSX;

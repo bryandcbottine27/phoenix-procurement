@@ -60,7 +60,11 @@ const { $, $$, fmtDate, escapeHtml, currentEntity, entityMeta, toast } = window.
         ((i.relatedType === 'order' && orderDocIds.has(i.relatedId)) || (i.relatedType === 'shipment' && shipDocIds.has(i.relatedId)))).length;
 
       const dqFn = window.PXUtils.orderDataQuality;
-      const dqScores = dqFn ? os.map(o => { const i = dqFn(o); const d = i.filter(x => x.level === 'danger').length; const w = i.filter(x => x.level === 'warn').length; return Math.max(0, 100 - d * 10 - w * 3); }) : [];
+      // Pass the full Data Quality context (shipments, calendars, helper fns) so the
+      // shipment-aware checks inside orderDataQuality score accurately — same context
+      // dqCockpit and order detail use. Built once and reused across this supplier's orders.
+      const dqCtx = window.PXUtils.dataQualityContext ? window.PXUtils.dataQualityContext() : {};
+      const dqScores = dqFn ? os.map(o => { const i = dqFn(o, dqCtx); const d = i.filter(x => x.level === 'danger').length; const w = i.filter(x => x.level === 'warn').length; return Math.max(0, 100 - d * 10 - w * 3); }) : [];
       const dqScore = dqScores.length ? Math.round(dqScores.reduce((a, b) => a + b, 0) / dqScores.length) : null;
 
       const delayPenalty = avgDelay != null ? Math.max(0, 100 - Math.min(100, Math.abs(Math.min(0, avgDelay || 0)) * 5)) : 100;
