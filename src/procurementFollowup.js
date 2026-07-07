@@ -121,7 +121,7 @@
   function grnCountsAsReceipt(receipt) {
     const rc = window.PXReceiptControl;
     if (rc && typeof rc.grnCountsAsReceipt === 'function') return rc.grnCountsAsReceipt(receipt);
-    const status = String(receipt?.status || '').toLowerCase();
+    const status = String(receipt?.status || '').trim().toLowerCase();
     return status !== 'pending' && status !== 'cancelled' && !!(receipt?.grnDate || receipt?.actualReceiptDate || receipt?.grnRef || receipt?.grnNumber);
   }
 

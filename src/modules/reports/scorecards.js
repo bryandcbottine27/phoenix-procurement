@@ -29,6 +29,12 @@ const { $, $$, fmtDate, escapeHtml, currentEntity, entityMeta, toast } = window.
       if (o && map[o.supplier]) map[o.supplier].shipments.push({ ...s, _order: o });
     });
 
+    const dqFn = window.PXUtils.orderDataQuality;
+    // Pass the full Data Quality context (shipments, calendars, helper fns) so the
+    // shipment-aware checks inside orderDataQuality score accurately — same context
+    // dqCockpit and order detail use. Build once per scorecard pass, not per supplier.
+    const dqCtx = window.PXUtils.dataQualityContext ? window.PXUtils.dataQualityContext() : {};
+
     return Object.values(map).map(sup => {
       const os = sup.orders, sh = sup.shipments;
       const totalOrders = os.length;
@@ -59,11 +65,6 @@ const { $, $$, fmtDate, escapeHtml, currentEntity, entityMeta, toast } = window.
       const issueCount = (st.data.issues || []).filter(i => !i.archived && i.status === 'open' &&
         ((i.relatedType === 'order' && orderDocIds.has(i.relatedId)) || (i.relatedType === 'shipment' && shipDocIds.has(i.relatedId)))).length;
 
-      const dqFn = window.PXUtils.orderDataQuality;
-      // Pass the full Data Quality context (shipments, calendars, helper fns) so the
-      // shipment-aware checks inside orderDataQuality score accurately — same context
-      // dqCockpit and order detail use. Built once and reused across this supplier's orders.
-      const dqCtx = window.PXUtils.dataQualityContext ? window.PXUtils.dataQualityContext() : {};
       const dqScores = dqFn ? os.map(o => { const i = dqFn(o, dqCtx); const d = i.filter(x => x.level === 'danger').length; const w = i.filter(x => x.level === 'warn').length; return Math.max(0, 100 - d * 10 - w * 3); }) : [];
       const dqScore = dqScores.length ? Math.round(dqScores.reduce((a, b) => a + b, 0) / dqScores.length) : null;
 

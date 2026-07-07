@@ -1058,9 +1058,9 @@ function nextShipmentSequence(orderId, shipments = state.data.shipments) {
   // shipment IDs themselves via shipmentSequence() (handles both "(S#)" and legacy
   // single-letter suffixes). We deliberately do NOT floor on related.length: a raw
   // count desyncs from the real max when a shipment is archived/restored or an ID is
-  // hand-edited, which could skip or duplicate a number. Archived shipments are
-  // excluded so a restored one keeps its original sequence instead of forcing a gap.
-  const related = (shipments || []).filter(sh => sh && sh.orderId === orderId && !sh.archived);
+  // hand-edited, which could skip or duplicate a number. Archived shipments stay in
+  // scope because their IDs remain reserved by the duplicate validator and audit log.
+  const related = (shipments || []).filter(sh => sh && sh.orderId === orderId);
   const maxSeq = related.reduce((max, sh) => Math.max(max, shipmentSequence(sh) || 0), 0);
   return maxSeq + 1;
 }

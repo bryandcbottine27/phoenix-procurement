@@ -62,6 +62,49 @@ function matchingLiteral(source, marker) {
   throw new Error(`Unclosed object literal after: ${marker}`);
 }
 
+function matchingFunction(source, name) {
+  const marker = `function ${name}`;
+  const markerPos = source.indexOf(marker);
+  if (markerPos === -1) throw new Error(`Function not found: ${name}`);
+  const start = source.indexOf('{', markerPos);
+  if (start === -1) throw new Error(`No function body for: ${name}`);
+
+  let depth = 0;
+  let quote = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let i = start; i < source.length; i++) {
+    const ch = source[i];
+    const next = source[i + 1];
+
+    if (lineComment) {
+      if (ch === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (ch === '*' && next === '/') { blockComment = false; i++; }
+      continue;
+    }
+    if (quote) {
+      if (escaped) { escaped = false; continue; }
+      if (ch === '\\') { escaped = true; continue; }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '/' && next === '/') { lineComment = true; i++; continue; }
+    if (ch === '/' && next === '*') { blockComment = true; i++; continue; }
+    if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return source.slice(markerPos, i + 1);
+    }
+  }
+  throw new Error(`Unclosed function body for: ${name}`);
+}
+
 function evaluateLiteral(literal, label) {
   try {
     return vm.runInNewContext(`(${literal})`, {}, { filename: label });
@@ -145,6 +188,32 @@ check('unknown production role has no navigation', viewLevel('made_up_role', 'da
 check('production no-role fallback is no_access',
   /return\s+isDemoMode\(\)\s*\?\s*'admin'\s*:\s*'no_access'/.test(core));
 check('no_access is intentionally absent from permission matrix', !Object.prototype.hasOwnProperty.call(permissions, 'no_access'));
+
+// --- Shipment sequence contracts ---
+const shipmentSequenceSource = matchingFunction(core, 'shipmentSequence');
+const nextShipmentSequenceSource = matchingFunction(core, 'nextShipmentSequence');
+const sequenceSandbox = { state: { data: { shipments: [] } } };
+vm.runInNewContext(
+  `${shipmentSequenceSource}\n${nextShipmentSequenceSource}\nthis.shipmentSequence = shipmentSequence;\nthis.nextShipmentSequence = nextShipmentSequence;`,
+  sequenceSandbox,
+  { filename: 'core-shipment-sequence.js' }
+);
+check('nextShipmentSequence does not exclude archived shipments in source',
+  !/&&\s*!sh\.archived/.test(nextShipmentSequenceSource));
+check('nextShipmentSequence counts archived S1 and returns S2',
+  sequenceSandbox.nextShipmentSequence('FPO-SEQ', [
+    { id: 'archived-s1', orderId: 'FPO-SEQ', shipmentId: 'FPO-SEQ (S1)', archived: true }
+  ]) === 2);
+check('nextShipmentSequence returns one above the highest archived or active sequence',
+  sequenceSandbox.nextShipmentSequence('FPO-SEQ', [
+    { id: 'active-s1', orderId: 'FPO-SEQ', shipmentId: 'FPO-SEQ (S1)' },
+    { id: 'active-s2', orderId: 'FPO-SEQ', shipmentId: 'FPO-SEQ (S2)' },
+    { id: 'archived-s3', orderId: 'FPO-SEQ', shipmentId: 'FPO-SEQ (S3)', archived: true }
+  ]) === 4);
+check('nextShipmentSequence starts at S1 when an order has no shipments',
+  sequenceSandbox.nextShipmentSequence('FPO-SEQ', []) === 1);
+check('shipmentSequence still parses legacy letter suffixes',
+  sequenceSandbox.shipmentSequence({ orderId: 'FPO-SEQ', shipmentId: 'FPO-SEQ C' }) === 3);
 
 const paymentsRender = read('src/modules/payments/payments.render.js');
 check('payment approval updates use the requested permission action',
@@ -275,6 +344,11 @@ check('stored import rule overrides matching baseline rule',
 
 // --- Data Quality checks ---
 const dataQualitySource = read('src/dataQuality.js');
+const procFollowupSource = read('src/procurementFollowup.js');
+check('Data Quality GRN fallback trims receipt status before comparison',
+  /String\(receipt\?\.status\s*\|\|\s*''\)\.trim\(\)\.toLowerCase\(\)/.test(dataQualitySource));
+check('Procurement Follow-up GRN fallback trims receipt status before comparison',
+  /String\(receipt\?\.status\s*\|\|\s*''\)\.trim\(\)\.toLowerCase\(\)/.test(procFollowupSource));
 const dataQualityWindow = {
   __state: {
     data: {
@@ -339,6 +413,15 @@ dqIssues = dq.orderDataQuality({
 }, dqContext);
 check('Data Quality fires ready/no-shipment after shared grace period',
   hasIssue(dqIssues, 'order-ready-no-shipment'));
+
+const scorecardsSource = read('src/modules/reports/scorecards.js');
+const scorecardBuildSource = matchingFunction(scorecardsSource, 'buildScorecard');
+const scorecardMapPos = scorecardBuildSource.indexOf('return Object.values(map).map');
+const scorecardDqCtxPos = scorecardBuildSource.indexOf('const dqCtx');
+check('Supplier scorecards build Data Quality context once before supplier loop',
+  scorecardDqCtxPos !== -1 && scorecardMapPos !== -1 && scorecardDqCtxPos < scorecardMapPos);
+check('Supplier scorecards pass Data Quality context into order scoring',
+  /dqFn\(o,\s*dqCtx\)/.test(scorecardBuildSource));
 
 // --- My Work computed action checks ---
 const myWorkSource = read('src/myWork.js');

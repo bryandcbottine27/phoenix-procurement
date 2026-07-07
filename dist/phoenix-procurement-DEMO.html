@@ -4196,9 +4196,9 @@ function nextShipmentSequence(orderId, shipments = state.data.shipments) {
   // shipment IDs themselves via shipmentSequence() (handles both "(S#)" and legacy
   // single-letter suffixes). We deliberately do NOT floor on related.length: a raw
   // count desyncs from the real max when a shipment is archived/restored or an ID is
-  // hand-edited, which could skip or duplicate a number. Archived shipments are
-  // excluded so a restored one keeps its original sequence instead of forcing a gap.
-  const related = (shipments || []).filter(sh => sh && sh.orderId === orderId && !sh.archived);
+  // hand-edited, which could skip or duplicate a number. Archived shipments stay in
+  // scope because their IDs remain reserved by the duplicate validator and audit log.
+  const related = (shipments || []).filter(sh => sh && sh.orderId === orderId);
   const maxSeq = related.reduce((max, sh) => Math.max(max, shipmentSequence(sh) || 0), 0);
   return maxSeq + 1;
 }
@@ -8276,7 +8276,7 @@ $('#print-back').addEventListener('click', () => {
   function grnCountsAsReceipt(receipt) {
     const rc = window.PXReceiptControl;
     if (rc && typeof rc.grnCountsAsReceipt === 'function') return rc.grnCountsAsReceipt(receipt);
-    const status = String(receipt?.status || '').toLowerCase();
+    const status = String(receipt?.status || '').trim().toLowerCase();
     return status !== 'pending' && status !== 'cancelled' && !!(receipt?.grnDate || receipt?.actualReceiptDate || receipt?.grnRef || receipt?.grnNumber);
   }
   function orderFunction(order, ctx) {
@@ -8943,7 +8943,7 @@ $('#print-back').addEventListener('click', () => {
   function grnCountsAsReceipt(receipt) {
     const rc = window.PXReceiptControl;
     if (rc && typeof rc.grnCountsAsReceipt === 'function') return rc.grnCountsAsReceipt(receipt);
-    const status = String(receipt?.status || '').toLowerCase();
+    const status = String(receipt?.status || '').trim().toLowerCase();
     return status !== 'pending' && status !== 'cancelled' && !!(receipt?.grnDate || receipt?.actualReceiptDate || receipt?.grnRef || receipt?.grnNumber);
   }
 
@@ -22492,6 +22492,12 @@ const { $, $$, fmtDate, escapeHtml, currentEntity, entityMeta, toast } = window.
       if (o && map[o.supplier]) map[o.supplier].shipments.push({ ...s, _order: o });
     });
 
+    const dqFn = window.PXUtils.orderDataQuality;
+    // Pass the full Data Quality context (shipments, calendars, helper fns) so the
+    // shipment-aware checks inside orderDataQuality score accurately — same context
+    // dqCockpit and order detail use. Build once per scorecard pass, not per supplier.
+    const dqCtx = window.PXUtils.dataQualityContext ? window.PXUtils.dataQualityContext() : {};
+
     return Object.values(map).map(sup => {
       const os = sup.orders, sh = sup.shipments;
       const totalOrders = os.length;
@@ -22522,11 +22528,6 @@ const { $, $$, fmtDate, escapeHtml, currentEntity, entityMeta, toast } = window.
       const issueCount = (st.data.issues || []).filter(i => !i.archived && i.status === 'open' &&
         ((i.relatedType === 'order' && orderDocIds.has(i.relatedId)) || (i.relatedType === 'shipment' && shipDocIds.has(i.relatedId)))).length;
 
-      const dqFn = window.PXUtils.orderDataQuality;
-      // Pass the full Data Quality context (shipments, calendars, helper fns) so the
-      // shipment-aware checks inside orderDataQuality score accurately — same context
-      // dqCockpit and order detail use. Built once and reused across this supplier's orders.
-      const dqCtx = window.PXUtils.dataQualityContext ? window.PXUtils.dataQualityContext() : {};
       const dqScores = dqFn ? os.map(o => { const i = dqFn(o, dqCtx); const d = i.filter(x => x.level === 'danger').length; const w = i.filter(x => x.level === 'warn').length; return Math.max(0, 100 - d * 10 - w * 3); }) : [];
       const dqScore = dqScores.length ? Math.round(dqScores.reduce((a, b) => a + b, 0) / dqScores.length) : null;
 
