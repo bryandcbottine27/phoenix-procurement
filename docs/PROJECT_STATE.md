@@ -147,7 +147,7 @@ Authentication and access:
 - Data Warehouse integration is a contract and adapter only. `PXWarehouse` defines the target shape and returns "not connected"; the current operational feed is Excel import.
 - Firestore security rule templates exist under `docs/FIRESTORE_RULES`. The authenticated template has been tightened to mirror the main app permission matrix and local regression checks guard the highest-risk assumptions, but the rules have not been deployed or validated against a production Firebase project in this repository.
 - Production package generation exists as a process and zip output, but production hosting, Firebase project separation, API-key restriction, and authentication deployment remain IT tasks.
-- Visual smoke testing is limited by local Firebase/auth/network behaviour in the desktop browser environment. Build validation passes, but browser role/entity walkthroughs should still be repeated before demo.
+- Visual smoke testing is limited by local Firebase/auth/network behaviour in the desktop browser environment. The built demo was opened through localhost and the initial login shell rendered with 62 inlined modules and no console warnings/errors; authenticated dashboard/role/entity walkthroughs should still be repeated before demo using an approved seeded profile or tester login.
 - Access grid documentation exists, but the role matrix is broad and should be re-tested after every access-sensitive change.
 - Edena import/export support exists in the code path, but it needs business pilot validation with real Edena export samples before it should be considered production-proven.
 
@@ -188,6 +188,7 @@ Last local validation during this handover pass:
 - Structural invariants: passed.
 - Pre-test data-integrity invariants and approved package-zip hygiene checks: passed.
 - Local role/security/import/Data Quality/My Work regression checks: passed.
+- Localhost browser smoke of the built demo login shell: passed; full authenticated dashboard walkthrough was not performed from this session to avoid creating/submitting a new Firebase demo profile.
 - JavaScript syntax check for all 62 modules: passed.
 - Demo build output generated: `dist/phoenix-procurement-DEMO.html`.
 - Isolated staged production build with `demoMode: false` and `authMode: 'password'`: passed.
