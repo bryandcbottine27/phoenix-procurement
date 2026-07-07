@@ -39,7 +39,7 @@ The generated artifact is:
 4. Inlines `styles/main.css` into `index.html`.
 5. Inlines every module listed in `build.py` in the exact expected order.
 6. Writes `dist/phoenix-procurement-DEMO.html`.
-7. Runs structural invariants in `tools/check_invariants.py`.
+7. Runs structural, high-risk data-integrity, and package-hygiene invariants in `tools/check_invariants.py`.
 
 The production package is generated from the same source with production settings in `APP_CONFIG`.
 

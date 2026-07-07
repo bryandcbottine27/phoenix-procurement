@@ -125,7 +125,7 @@ This currently performs:
 - data dictionary drift check
 - JavaScript syntax check for all modules
 - generated demo build
-- structural invariant checks
+- structural invariant checks, including the pre-test data integrity guards and package zip hygiene
 
 There is currently no `package.json`, lint runner, TypeScript checker, unit test suite, migration runner, or Firebase rules validation command in the repo. If you add any of these, update this file and `docs/PROJECT_STATE.md`.
 

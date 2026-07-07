@@ -36,7 +36,7 @@ Core application foundation:
 - Central state and navigation via `window.__state`, `window.__renderers`, and `PXUtils`.
 - Central data dictionary source in `src/schema.js`.
 - Generated `docs/DATA_DICTIONARY.md`, currently 358 fields across schema.
-- Build-time invariant checks in `tools/check_invariants.py`.
+- Build-time invariant checks in `tools/check_invariants.py`, including structure, status-map, pre-test data-integrity, and package-zip hygiene checks.
 - JavaScript syntax gate through Node `--check` in `build.py`.
 
 Data and write control:
@@ -161,7 +161,7 @@ Authentication and access:
 
 ## Current known bugs and limitations
 
-- No `package.json`, npm test, lint, or TypeScript configuration exists. Current validation is Python build, generated data dictionary check, structural invariant checks, and Node syntax checks.
+- No `package.json`, npm test, lint, or TypeScript configuration exists. Current validation is Python build, generated data dictionary check, Node syntax checks, and invariant checks for structure, status maps, pre-test data-integrity guards, and package zip hygiene.
 - Browser/client-side permission checks are not sufficient for production security. Firestore rules and authenticated identity must enforce access server-side before go-live.
 - Demo mode still contains demo aids such as role switching. The guarded demo purge code remains for isolated reset testing, but `REF.demoResetEnabled` is disabled by default and must stay disabled for shared testing, pilot, and production builds.
 - SharePoint upload is not live; documents are metadata/link/demo-upload records only.
@@ -184,6 +184,7 @@ Last local validation during this handover pass:
 - `python build.py` with bundled Node/Python: passed.
 - Data dictionary regenerated and checked: passed.
 - Structural invariants: passed.
+- Pre-test data-integrity invariants and approved package-zip hygiene checks: passed.
 - JavaScript syntax check for all 62 modules: passed.
 - Demo build output generated: `dist/phoenix-procurement-DEMO.html`.
 - Isolated staged production build with `demoMode: false` and `authMode: 'password'`: passed.

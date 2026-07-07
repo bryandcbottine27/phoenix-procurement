@@ -1515,13 +1515,17 @@ REF literal). All form/filter/mapping code already used the canonical list; this
 of two coexisting "truths". `statusOptionsHtml` still shows any out-of-list value as "(legacy)".
 
 **Build-time invariant checks.** `tools/check_invariants.py` runs at the end of `build.py` and FAILS the
-build (non-zero exit) on any structural regression. It asserts: nav view <-> renderer <-> view-section
-integrity; breadcrumb and navSection coverage; every `window.PX*` engine referenced is defined; every
-`window.__*` bridge referenced is defined; every inline `onclick` target resolves; dist module braces
-balanced and zero un-inlined module tags; every `REF.erpStatusMap.po` target is a valid
-`orderFollowupStatuses` value; importers never seed the bare invalid `'open'`/`'Order placed'` order
-status; and `VALIDATOR_TYPE` has no dead mappings (each mapped kind has a `validateX` function). Add a
-new check by appending a `check(name, condition, detail)` call. This converts the manual audit checks
+build (non-zero exit) on structural or high-risk data-control regression. It asserts: nav view <->
+renderer <-> view-section integrity; breadcrumb and navSection coverage; every `window.PX*` engine
+referenced is defined; every `window.__*` bridge referenced is defined; every inline `onclick` target
+resolves; dist module braces balanced and zero un-inlined module tags; every `REF.erpStatusMap.po`
+target is a valid `orderFollowupStatuses` value; importers never seed the bare invalid
+`'open'`/`'Order placed'` order status; `VALIDATOR_TYPE` has no dead mappings (each mapped kind has a
+`validateX` function); production SharePoint folder fields stay mapped in `docs.service.js`; pre-test
+data-integrity guards stay in place for milestone allocation, ready/no-shipment ageing, shipment receipt
+evidence, shipment ID/status validation, duplicate shipment IDs, and demo reset gating; and the project
+root contains exactly the approved Demo and Production package zip names. Add
+a new check by appending a `check(name, condition, detail)` call. This converts the manual audit checks
 into an automated gate.
 
 **Optimistic concurrency (stale-write protection).** `PXStore.updateRecord` accepts an optional

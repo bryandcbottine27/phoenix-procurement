@@ -15,6 +15,8 @@ These are the same checks that were previously done by hand during code audits:
   8. The importer never seeds the bare invalid 'open' / 'Order placed' order status.
   9. VALIDATOR_TYPE contains no dead mappings (every type has a validateX function).
   10. The SharePoint-ready document folder shape exists.
+  11. Pre-test data integrity controls stay in place.
+  12. Only the two approved package zip names exist in the project root.
 
 Run:  python3 tools/check_invariants.py
 """
@@ -127,6 +129,52 @@ def main():
     doc_folder_keys = set(re.findall(r"key:\s*'([^']+)'", doc_folder_block))
     missing_doc_folders = required_doc_folders - doc_folder_keys
     check("document folders support PO/Shipping/Payment/GRN", not missing_doc_folders, f"missing: {sorted(missing_doc_folders)}")
+
+    # --- 11. Pre-test data integrity controls ---
+    data_quality = read('src/dataQuality.js')
+    proc_followup = read('src/procurementFollowup.js')
+    my_work = read('src/myWork.js')
+    order_render = read('src/modules/orders/orders.render.js')
+    order_form = read('src/modules/orders/orders.form.js')
+    payments_service = read('src/modules/payments/payments.service.js')
+    payments_form = read('src/modules/payments/payments.form.js')
+    shipment_form = read('src/modules/shipments/shipments.form.js')
+    erp_import = read('src/modules/reports/erpImport.js')
+
+    integrity_failures = []
+    if not re.search(r"demoResetEnabled:\s*false", core):
+        integrity_failures.append("REF.demoResetEnabled must default false")
+    if "REF.demoResetEnabled" not in erp_import or re.search(r"const demo\s*=\s*!\(window\.__isDemoMode\)", erp_import):
+        integrity_failures.append("purgeAllData must require demo mode and demoResetEnabled")
+    if not re.search(r"readyNoShipmentWorkingDays:\s*2", data_quality):
+        integrity_failures.append("Data Quality ready/no-shipment threshold must be 2 working days")
+    if "readyNoShipmentWorkingDays" not in proc_followup or "readyNoShipmentWorkingDays" not in my_work:
+        integrity_failures.append("ready/no-shipment checks must use the shared DQ threshold")
+    if "Shipment status is required" not in validators:
+        integrity_failures.append("shipment status must be validator-required")
+    if "already in use on order" not in validators or "checkShipmentDuplicates" not in shipment_form or "Save anyway?" in shipment_form[shipment_form.find("checkShipmentDuplicates"):shipment_form.find("Validate the linked order actually exists")]:
+        integrity_failures.append("duplicate shipment IDs must be hard-blocked")
+    if "Receipt result shows goods were received" not in validators or "linked GRN date" not in validators:
+        integrity_failures.append("received shipment results must require a GRN date/link")
+    if "shipment.grnDate || linkedGrn" not in core:
+        integrity_failures.append("Await GRN action must require actual GRN evidence")
+    if "PXReceiptControl.grnCountsAsReceipt" not in order_render or "r.grnCountsAsReceipt" in order_render:
+        integrity_failures.append("order Awaiting/Overdue filters must use the GRN helper")
+    if "allocateMilestoneAmounts" not in core or "allocateMilestoneAmounts(orderAmount, schedule)" not in core:
+        integrity_failures.append("generated milestones must use the shared amount allocator")
+    if "milestoneAmountsLookPercentDerived" not in payments_service or "milestoneAmountsLookPercentDerived" not in payments_form or "milestoneAmountsLookPercentDerived" not in order_form:
+        integrity_failures.append("payment forecast/RFP/order save must preserve reconciled milestone amounts")
+    if "case 'grn_date'" not in core or "PXReceiptControl" not in _block(core, "case 'grn_date':", close="break;"):
+        integrity_failures.append("GRN-date milestone anchor must read receipt control data")
+    check("pre-test data integrity controls stay enforced", not integrity_failures, f"issues: {integrity_failures}")
+
+    # --- 12. Package zip hygiene ---
+    approved_zips = {'Phoenix Procurement DEMO FULL.zip', 'Phoenix Procurement PRODUCTION FULL.zip'}
+    root_zips = {os.path.basename(p) for p in glob.glob(os.path.join(ROOT, '*.zip'))}
+    extra_zips = sorted(root_zips - approved_zips)
+    missing_zips = sorted(approved_zips - root_zips)
+    check("only approved package zips exist", not extra_zips and not missing_zips,
+          f"extra: {extra_zips}; missing: {missing_zips}")
 
     print()
     if FAILURES:
