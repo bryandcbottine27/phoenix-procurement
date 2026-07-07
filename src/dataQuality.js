@@ -8,6 +8,7 @@
   const DQ = {
     acknowledgementWorkingDays: 3,
     noFollowupWorkingDays: 5,
+    readyNoShipmentWorkingDays: 2,
     receiptLookAheadWorkingDays: 7,
     shipmentEtdWorkingDays: 5,
     etaClearanceLookAheadWorkingDays: 7,
@@ -151,7 +152,7 @@
       else if (receiptDays !== null && receiptDays <= DQ.receiptLookAheadWorkingDays) issues.push({ key: 'order-requested-receipt-approaching', level: 'warn', msg: `Requested receipt is within ${DQ.receiptLookAheadWorkingDays} working days with no receipt recorded.` });
     }
     const readyAge = workingDaysSince(order.orderReadyDate, entity);
-    if (!order.isClosed && isForeignGoods && order.orderReadyDate && activeShipments.length === 0 && readyAge !== null && readyAge > 2) {
+    if (!order.isClosed && isForeignGoods && order.orderReadyDate && activeShipments.length === 0 && readyAge !== null && readyAge > DQ.readyNoShipmentWorkingDays) {
       issues.push({ key: 'order-ready-no-shipment', level: 'warn', msg: 'Goods are ready but no active shipment has been created.' });
     }
 

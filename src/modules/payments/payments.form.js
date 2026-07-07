@@ -33,9 +33,13 @@ window.openPaymentForm = async function(payId = null, orderIdPrefill = null, mil
       p.description = ord.description;
       // If milestone specified, prefill amount/date from milestone instead of order
       if (milestoneIdPrefill && ord.milestones) {
-        prefillMilestone = ord.milestones.find(m => m.id === milestoneIdPrefill);
+        const milestoneIndex = ord.milestones.findIndex(m => m.id === milestoneIdPrefill);
+        prefillMilestone = milestoneIndex >= 0 ? ord.milestones[milestoneIndex] : null;
         if (prefillMilestone) {
-          p.amount = prefillMilestone.amount;
+          const allocatedAmounts = window.PXUtils.milestoneAmountsLookPercentDerived && window.PXUtils.milestoneAmountsLookPercentDerived(ord.amount, ord.milestones)
+            ? window.PXUtils.allocateMilestoneAmounts(ord.amount, ord.milestones)
+            : null;
+          p.amount = allocatedAmounts ? allocatedAmounts[milestoneIndex] : prefillMilestone.amount;
           p.milestoneId = prefillMilestone.id;
           p.milestoneLabel = prefillMilestone.label;
           // due date = milestone's computed expected date, falling back to override

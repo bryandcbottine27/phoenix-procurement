@@ -39,7 +39,17 @@ function renderOrdersList(type, fn) {
   // Default 'allopen'. Values: allopen | overdue | awaiting | closed.
   const bcView = filters.bcView || 'allopen';
   const _today = new Date();
-  const _isReceived = o => !!(o.deliveryDate || o.actualReceiptDate || (o.receipts && o.receipts.some(r => r.grnCountsAsReceipt)));
+  const _receiptCounts = r => window.PXReceiptControl
+    ? window.PXReceiptControl.grnCountsAsReceipt(r)
+    : !!(r && !['pending', 'cancelled'].includes(String(r.status || '').toLowerCase()) && (r.grnDate || r.actualReceiptDate || r.grnRef || r.grnNumber));
+  const _isReceived = o => {
+    if (o.deliveryDate || o.actualReceiptDate || (Array.isArray(o.receipts) && o.receipts.some(_receiptCounts))) return true;
+    return (state.data.shipments || []).some(s =>
+      !s.archived
+      && window.PXUtils.shipmentBelongsToOrder
+      && window.PXUtils.shipmentBelongsToOrder(s, o)
+      && (s.deliveryDate || s.grnDate));
+  };
   const _isOverdue = o => {
     if (o.isClosed) return false;
     const rr = o.requestedReceiptDate ? new Date(o.requestedReceiptDate) : null;

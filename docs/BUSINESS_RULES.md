@@ -148,6 +148,13 @@ GRN row fields:
 - Remarks/notes, optional.
 - Status: pending, partially received, fully received, cancelled.
 
+Validation/control:
+
+- Shipment status is required on every shipment record.
+- A received shipment result, such as fully received, partially received, short, missing, damaged, or over received, must have a shipment GRN date or a linked order GRN date.
+- A shipment follow-up action of "Await GRN / store confirmation" is not considered processed by receipt result text alone; it requires a shipment GRN date or linked order GRN date.
+- Shipment references must be unique, including archived records, to avoid S1/S2 collision if a shipment is restored.
+
 Shipment record rules:
 
 - Each actual shipment normally has its own shipment record.
@@ -206,6 +213,7 @@ Confirmed:
 
 - Payment terms drive milestone schedules where possible.
 - Payment schedule/milestones may be generated from payment terms and manually adjusted where required.
+- Generated percentage-based milestone amounts should reconcile to the PO total. When percentages total 100%, the final milestone absorbs rounding pennies/cents so 33.33/33.33/33.34-style splits equal the order amount.
 - Multiple payment requests/RFPs can exist per PO.
 - A milestone can link to an RFP.
 - RFP status includes draft, forthcoming, submitted, approved, paid, rejected.
@@ -320,7 +328,7 @@ Confirmed:
 
 Current exceptions:
 
-- Demo purge hard-deletes test data only in demo/admin mode.
+- Demo purge hard-deletes test data only in isolated demo/admin mode and must remain disabled by default for shared testing, pilot, and production.
 - Officer bootstrap writes the user profile directly during sign-in.
 - RFP counter uses Firestore transaction.
 
@@ -337,6 +345,7 @@ Confirmed:
 Confirmed warning/control points:
 
 - Order sent with no follow-up/activity for more than 5 working days.
+- Foreign goods ready for more than 2 working days with no shipment requested.
 - Shipment open more than 5 working days without ETD.
 - ETA within 7 working days without broker documents or clearance owner.
 - Cargo arrived but clearance not started within 3 working days.

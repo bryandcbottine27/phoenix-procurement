@@ -93,7 +93,7 @@ Allowed exceptions:
 
 - Officer profile bootstrap in `core.js`, because the officer document id must equal the Firebase Auth UID and runs before the normal state is ready.
 - Atomic RFP counter `runTransaction` in `payments.service.js`.
-- Demo-only full purge in `erpImport.js`, guarded to demo/admin only, for clearing test data.
+- Demo-only full purge in `erpImport.js`, guarded to demo/admin only and disabled by default, for isolated demo reset testing only.
 - Internal `PXStore` itself, because it wraps the Firestore primitives.
 
 Constraint:

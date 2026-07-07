@@ -80,6 +80,7 @@ Finance and payment control:
 - Payment requests/RFP module with per-entity RFP reference numbering.
 - Milestone-driven forthcoming payments forecast.
 - Payment schedule on orders with milestone statuses.
+- Percentage-generated milestone amounts reconcile to the order total by assigning rounding remainder to the final milestone when percentages total 100%.
 - Payment detail and printable RFP.
 - Payment request write permissions enforced through `PXStore` and UI permission checks.
 - View-only users can view payments but should not be able to create payment requests.
@@ -89,6 +90,7 @@ Operational follow-up:
 - My Work cross-entity action queue.
 - My Day toggle.
 - Snooze support for computed actions.
+- Ready-without-shipment warnings use a shared 2-working-day grace period across Data Quality, My Work, and procurement follow-up risk scoring.
 - Contact log collection and log-a-chase flow.
 - Update Requests flow from order and shipment rows/details.
 - Data Quality Cockpit.
@@ -161,7 +163,7 @@ Authentication and access:
 
 - No `package.json`, npm test, lint, or TypeScript configuration exists. Current validation is Python build, generated data dictionary check, structural invariant checks, and Node syntax checks.
 - Browser/client-side permission checks are not sufficient for production security. Firestore rules and authenticated identity must enforce access server-side before go-live.
-- Demo mode still contains demo aids such as role switching and guarded demo purge. These must stay disabled in production builds.
+- Demo mode still contains demo aids such as role switching. The guarded demo purge code remains for isolated reset testing, but `REF.demoResetEnabled` is disabled by default and must stay disabled for shared testing, pilot, and production builds.
 - SharePoint upload is not live; documents are metadata/link/demo-upload records only.
 - Data Warehouse sync is not live; Excel import is the current staging feed.
 - Large generated single HTML is expected. Do not edit it by hand.
@@ -169,10 +171,11 @@ Authentication and access:
 
 ## Immediate next development priorities
 
-1. Repeat a visual smoke test of dashboard, entity switching, filter pane, order detail, shipment detail, Exports/Outbound, KPI Trends capture/backfill, payment permissions, and production login mode.
-2. Re-test access rules for view-only users, especially payment request creation, exports, KPI capture, and update request visibility.
-3. Create automated checks for permission-sensitive actions and My Work disappearing-after-processed logic.
-4. Decide the next delivery tranche: either SharePoint adapter design, Data Warehouse/API design, or operational feature polishing. Do not mix these without a milestone boundary.
+1. Browser-test the pre-testing stability fixes: demo purge hidden/blocked, duplicate shipment ID blocked, blank shipment status blocked, receipt result requiring GRN date/link, ready-without-shipment grace period, milestone amount reconciliation, and order Awaiting/Overdue filters after GRN.
+2. Repeat a visual smoke test of dashboard, entity switching, filter pane, order detail, shipment detail, Exports/Outbound, KPI Trends capture/backfill, payment permissions, and production login mode.
+3. Re-test access rules for view-only users, especially payment request creation, exports, KPI capture, update request visibility, and GRN entry through orders versus shipments.
+4. Create automated checks for permission-sensitive actions and My Work disappearing-after-processed logic.
+5. Decide the next delivery tranche: either SharePoint adapter design, Data Warehouse/API design, or operational feature polishing. Do not mix these without a milestone boundary.
 
 ## Current validation baseline
 

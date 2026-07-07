@@ -626,9 +626,10 @@ window.__purgeCancel = () => { _purgeCancel = true; };
 async function purgeAllData(opts = {}) {
   // Hard guard on the most destructive action (defense in depth — the button is also
   // hidden outside demo mode): never runs in production, and only for an admin.
-  const demo = !(window.__isDemoMode) || window.__isDemoMode();
+  const demo = !!(window.__isDemoMode && window.__isDemoMode());
+  const enabled = !!(window.REF && window.REF.demoResetEnabled);
   const role = (window.PXUtils && window.PXUtils.currentRole) ? window.PXUtils.currentRole() : 'admin';
-  if (!demo || role !== 'admin') {
+  if (!demo || !enabled || role !== 'admin') {
     if (window.PXUtils && window.PXUtils.toast) window.PXUtils.toast('Clearing all data is disabled in this environment.', 'danger');
     throw new Error('purgeAllData is not permitted here.');
   }

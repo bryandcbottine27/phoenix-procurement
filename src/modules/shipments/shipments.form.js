@@ -622,7 +622,8 @@ window.openShipmentForm = function(shipId = null, orderId = '', supplier = '', o
     // Soft duplicate warning for shipment ID reuse
     const shipDupW = checkShipmentDuplicates(data, state.data.shipments, isEdit, isEdit ? shipId : null);
     if (shipDupW.length) {
-      if (!confirm('Possible duplicate:\n\n• ' + shipDupW.join('\n• ') + '\n\nSave anyway?')) return;
+      toast(shipDupW[0], 'danger');
+      return;
     }
     // Validate the linked order actually exists
     const linkedOrder = state.data.orders.find(ord => ord.orderId === data.orderId);

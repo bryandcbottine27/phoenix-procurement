@@ -3244,8 +3244,8 @@ const REF = {
      The permanent "Clear all data" purge is a DEMO-ONLY tool for resetting an
      isolated demo Firestore. It is hidden unless this flag is true AND the current
      officer is admin, and it requires a successful "Backup All" first.
-     MUST be left false (or the purge code removed) before any pilot/production use. */
-  demoResetEnabled: true,
+     MUST be left false (or the purge code removed) before any shared pilot/production use. */
+  demoResetEnabled: false,
 
   categories: [
     "RM - Ingredients", "Primary Packaging", "Secondary Packaging", "Finished Products",
@@ -3533,7 +3533,7 @@ const REF = {
     upcomingDays: 30,        // within this many days = "Upcoming" (yellow)
     noAckDays: 7,            // order older than this with no supplier acknowledgement
     arrivedNoGrnGraceDays: 0,// ETA passed by this many days and still no GRN = action
-    readyNoShipmentDays: 0,  // order ready this many days ago but no shipment requested
+    readyNoShipmentDays: 2,  // order ready more than this many working days ago but no shipment requested
     requestedNotAssignedDays: 0 // shipment requested this many days ago, still unassigned
   },
   // Fallback lead time (days from order date) used ONLY to estimate a milestone's
@@ -4266,7 +4266,15 @@ function shipmentFollowupActionOpen(shipment, data = state.data) {
     return !hasIssue;
   }
   if (action === "Await GRN / store confirmation") {
-    return !(shipment.grnDate || ["Fully received", "Partially received", "Short received", "Missing goods", "Damaged goods", "Over received"].includes(shipment.receiptResult || ""));
+    const order = shipment.orderId ? (data.orders || []).find(o => o.orderId === shipment.orderId) : null;
+    const keys = [shipment.id, shipment.shipmentId].filter(Boolean).map(String);
+    const linkedGrn = order && Array.isArray(order.receipts) && order.receipts.some(receipt => {
+      const status = String(receipt?.status || '').toLowerCase();
+      return status !== 'pending' && status !== 'cancelled'
+        && keys.includes(String(receipt.shipmentId || ''))
+        && !!(receipt.grnDate || receipt.actualReceiptDate);
+    });
+    return !(shipment.grnDate || linkedGrn);
   }
   return true;
 }
@@ -5451,6 +5459,7 @@ window.PXUtils = {
   collection, doc, addDoc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy,
   limit, serverTimestamp, runTransaction, getDocs,
   // milestone helpers added below
+  allocateMilestoneAmounts, milestoneAmountsLookPercentDerived,
   generateMilestonesFromTerm, computeMilestoneDate, milestoneStatus,
   // function helpers
   orderFunction, functionForCategory, orderNeedsShipment,
@@ -6240,16 +6249,57 @@ function orderNeedsShipment(o) {
    These convert a payment term string + the order/shipment context
    into an array of milestone objects with expected dates filled in.
 ============================================================ */
+function roundMoneyAmount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+function allocateMilestoneAmounts(orderAmount, milestones) {
+  const amount = Number(orderAmount);
+  const items = Array.isArray(milestones) ? milestones : [];
+  if (!Number.isFinite(amount) || !items.length) return items.map(() => null);
+  const totalPct = items.reduce((sum, item) => sum + (Number(item?.percent) || 0), 0);
+  const rebalanceFinal = Math.abs(totalPct - 100) <= 0.01;
+  const totalCents = Math.round((amount + Number.EPSILON) * 100);
+  let allocatedCents = 0;
+  return items.map((item, idx) => {
+    const percent = Number(item?.percent) || 0;
+    let cents;
+    if (rebalanceFinal && idx === items.length - 1) {
+      cents = totalCents - allocatedCents;
+    } else {
+      cents = Math.round(totalCents * percent / 100);
+      allocatedCents += cents;
+    }
+    return cents / 100;
+  });
+}
+
+function milestoneAmountsLookPercentDerived(orderAmount, milestones) {
+  const amount = Number(orderAmount);
+  const items = Array.isArray(milestones) ? milestones : [];
+  if (!Number.isFinite(amount) || !items.length) return false;
+  const totalPct = items.reduce((sum, item) => sum + (Number(item?.percent) || 0), 0);
+  if (Math.abs(totalPct - 100) > 0.01) return false;
+  return items.every(item => {
+    if (item?.amount == null || item.amount === '') return true;
+    const expected = roundMoneyAmount(amount * (Number(item?.percent) || 0) / 100);
+    return expected != null && Math.abs(Number(item.amount) - expected) <= 0.011;
+  });
+}
+
 function generateMilestonesFromTerm(termString, orderAmount) {
   if (!termString) return [];
   const schedule = REF.paymentSchedules[termString];
   if (!schedule) return []; // custom/unknown term — user builds manually
+  const amounts = allocateMilestoneAmounts(orderAmount, schedule);
   return schedule.map((stage, idx) => ({
     id: 'm' + (idx + 1) + '_' + Math.random().toString(36).slice(2, 7),
     seq: idx + 1,
     label: stage.label,
     percent: stage.percent,
-    amount: orderAmount ? +(orderAmount * stage.percent / 100).toFixed(2) : null,
+    amount: amounts[idx],
     anchor: stage.anchor,
     offset: stage.offset,
     expectedDate: null,   // computed dynamically when order/shipment dates change
@@ -6281,15 +6331,33 @@ function computeMilestoneDate(milestone, order, ships) {
       }
       return null;
     case 'bl_date':
-    case 'eta':
-    case 'grn_date': {
+    case 'eta': {
       // Earliest matching shipment date
       const matchingShips = ships.filter(s => shipmentBelongsToOrder(s, order));
       if (matchingShips.length === 0) return null;
-      const field = milestone.anchor === 'bl_date' ? 'blDate' : milestone.anchor === 'eta' ? 'eta' : 'grnDate';
+      const field = milestone.anchor === 'bl_date' ? 'blDate' : 'eta';
       const dates = matchingShips.map(s => s[field]).filter(Boolean).map(d => d.toDate ? d.toDate() : new Date(d));
       if (dates.length === 0) return null;
       anchorDate = new Date(Math.min(...dates.map(d => d.getTime())));
+      break;
+    }
+    case 'grn_date': {
+      const dates = [];
+      const matchingShips = (ships || []).filter(s => shipmentBelongsToOrder(s, order));
+      matchingShips.forEach(s => {
+        const receiptDate = window.PXReceiptControl
+          ? window.PXReceiptControl.shipmentReceiptDate(order, s)
+          : (s.deliveryDate || s.grnDate);
+        if (receiptDate) dates.push(receiptDate);
+      });
+      (Array.isArray(order.receipts) ? order.receipts : []).forEach(r => {
+        const status = String(r?.status || '').toLowerCase();
+        if (status === 'pending' || status === 'cancelled') return;
+        if (!r.shipmentId && (r.actualReceiptDate || r.grnDate)) dates.push(r.actualReceiptDate || r.grnDate);
+      });
+      const parsed = dates.map(d => d?.toDate ? d.toDate() : new Date(d)).filter(d => d && !isNaN(d));
+      if (parsed.length === 0) return null;
+      anchorDate = new Date(Math.min(...parsed.map(d => d.getTime())));
       break;
     }
     case 'erection': anchorDate = order.erectionDate; break;
@@ -7122,6 +7190,7 @@ $('#print-back').addEventListener('click', () => {
   const num = v => (v === '' || v === null || v === undefined) ? null : Number(v);
   const isNum = v => v !== null && v !== '' && v !== undefined && !isNaN(Number(v));
   const toDate = v => { if (!v) return null; const d = v.toDate ? v.toDate() : new Date(v); return isNaN(d) ? null : d; };
+  const norm = v => String(v || '').trim().toLowerCase();
 
   // Basic link safety: allow http(s), SharePoint/OneDrive, and plain file paths.
   // Block javascript:, data:, and obviously malformed values.
@@ -7180,6 +7249,29 @@ $('#print-back').addEventListener('click', () => {
     if (Array.isArray(data.milestones) && data.milestones.length) {
       const sum = data.milestones.reduce((s, m) => s + (Number(m.percent) || 0), 0);
       if (Math.round(sum) !== 100) completeness.push(`Milestone percentages total ${sum}% (must equal 100%).` + histSuffix);
+      if (isNum(data.amount)) {
+        const milestoneAmount = data.milestones.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+        if (Math.abs(milestoneAmount - Number(data.amount)) > 0.05) {
+          warnings.push(`Milestone amounts total ${milestoneAmount.toFixed(2)}, which does not reconcile to the order amount ${Number(data.amount).toFixed(2)}.`);
+        }
+      }
+    }
+    if (Array.isArray(data.receipts) && data.receipts.length) {
+      const shipments = state().data.shipments || [];
+      data.receipts.forEach((receipt, index) => {
+        const status = norm(receipt?.status || 'fully received');
+        const activeReceipt = status !== 'pending' && status !== 'cancelled';
+        if (activeReceipt && !(receipt?.grnDate || receipt?.actualReceiptDate)) {
+          warnings.push(`GRN row ${index + 1} has no receipt date; OTIF and ageing reports may treat it as incomplete.`);
+        }
+        if (receipt?.shipmentId) {
+          const linked = shipments.find(s => String(s.id || '') === String(receipt.shipmentId) || String(s.shipmentId || '') === String(receipt.shipmentId));
+          if (!linked) warnings.push(`GRN row ${index + 1} links to a shipment that is not currently present.`);
+          else if (String(linked.orderId || '') !== String(data.orderId || '')) {
+            errors.push(`GRN row ${index + 1} links to shipment ${linked.shipmentId || linked.id}, which belongs to order ${linked.orderId || 'unknown'}.`);
+          }
+        }
+      });
     }
     // Requested receipt date sanity
     const od = toDate(data.dateOfOrder), rr = toDate(data.requestedReceiptDate);
@@ -7222,6 +7314,36 @@ $('#print-back').addEventListener('click', () => {
   function validateShipment(data, existing) {
     const errors = [], warnings = [];
     if (!data.orderId) errors.push('Shipment must be linked to an order.');
+    if (!data.shipmentId || !String(data.shipmentId).trim()) errors.push('Shipment ID is required.');
+    if (!data.status || !String(data.status).trim()) errors.push('Shipment status is required.');
+    const validStatuses = window.REF?.shipmentFollowupStatuses || [];
+    if (data.status && validStatuses.length && !validStatuses.includes(data.status)) {
+      warnings.push(`Shipment status "${data.status}" is not in the current logistics status list.`);
+    }
+    const currentId = existing?.id || data.id || null;
+    const duplicate = (state().data.shipments || []).find(sh =>
+      sh && sh.id !== currentId && norm(sh.shipmentId) === norm(data.shipmentId));
+    if (duplicate) errors.push(`Shipment ID "${data.shipmentId}" is already in use on order ${duplicate.orderId || 'unknown'}.`);
+
+    const validReceiptResults = window.REF?.shipmentReceiptResults || [];
+    if (data.receiptResult && validReceiptResults.length && !validReceiptResults.includes(data.receiptResult)) {
+      errors.push(`Receipt result "${data.receiptResult}" is not valid.`);
+    }
+    const receivedResults = ['fully received', 'partially received', 'short received', 'missing goods', 'damaged goods', 'over received'];
+    const shipmentKeys = [existing?.id, data.id, existing?.shipmentId, data.shipmentId].filter(Boolean).map(String);
+    const linkedOrder = (state().data.orders || []).find(o => String(o.orderId || '') === String(data.orderId || ''));
+    const hasLinkedGrnDate = !!(linkedOrder && Array.isArray(linkedOrder.receipts) && linkedOrder.receipts.some(receipt => {
+      const status = norm(receipt?.status || 'fully received');
+      return status !== 'pending' && status !== 'cancelled'
+        && shipmentKeys.includes(String(receipt.shipmentId || ''))
+        && !!(receipt.grnDate || receipt.actualReceiptDate);
+    }));
+    if (receivedResults.includes(norm(data.receiptResult)) && !data.grnDate && !hasLinkedGrnDate) {
+      errors.push('Receipt result shows goods were received, but no GRN date or linked GRN is recorded.');
+    }
+    if (data.grnNumber && !data.grnDate && !hasLinkedGrnDate) {
+      errors.push('GRN number is set but no GRN date or linked GRN date is recorded.');
+    }
     const eta = toDate(data.eta), grn = toDate(data.grnDate), etd = toDate(data.etd);
     if (etd && eta && eta < etd) errors.push('ETA cannot be before ETD.');
     if (eta && grn && grn < eta) errors.push('GRN (goods received) date cannot be before the ETA — goods cannot be received before they arrive.');
@@ -8059,6 +8181,7 @@ $('#print-back').addEventListener('click', () => {
   const DQ = {
     acknowledgementWorkingDays: 3,
     noFollowupWorkingDays: 5,
+    readyNoShipmentWorkingDays: 2,
     receiptLookAheadWorkingDays: 7,
     shipmentEtdWorkingDays: 5,
     etaClearanceLookAheadWorkingDays: 7,
@@ -8202,7 +8325,7 @@ $('#print-back').addEventListener('click', () => {
       else if (receiptDays !== null && receiptDays <= DQ.receiptLookAheadWorkingDays) issues.push({ key: 'order-requested-receipt-approaching', level: 'warn', msg: `Requested receipt is within ${DQ.receiptLookAheadWorkingDays} working days with no receipt recorded.` });
     }
     const readyAge = workingDaysSince(order.orderReadyDate, entity);
-    if (!order.isClosed && isForeignGoods && order.orderReadyDate && activeShipments.length === 0 && readyAge !== null && readyAge > 2) {
+    if (!order.isClosed && isForeignGoods && order.orderReadyDate && activeShipments.length === 0 && readyAge !== null && readyAge > DQ.readyNoShipmentWorkingDays) {
       issues.push({ key: 'order-ready-no-shipment', level: 'warn', msg: 'Goods are ready but no active shipment has been created.' });
     }
 
@@ -8987,7 +9110,8 @@ $('#print-back').addEventListener('click', () => {
     }
 
     const readyAge = workingSince(order.orderReadyDate, entity);
-    if (!isClosed(order) && needsShipment(order) && order.orderReadyDate && !ships.length && readyAge !== null && readyAge >= 0) {
+    const readyNoShipmentLimit = Number.isFinite(Number(dq.readyNoShipmentWorkingDays)) ? Number(dq.readyNoShipmentWorkingDays) : 2;
+    if (!isClosed(order) && needsShipment(order) && order.orderReadyDate && !ships.length && readyAge !== null && readyAge > readyNoShipmentLimit) {
       add('ready-no-shipment', 'warn', `Goods are ready but no shipment has been requested (${readyAge} working day(s)).`, 15);
     }
 
@@ -9551,9 +9675,10 @@ function myWorkCompute(opts) {
       // foreign order ready but no shipment requested
       if (orderNeedsShipment(o) && o.orderReadyDate) {
         const linked = ships.filter(s => s.orderId === o.orderId);
-        const n = daysFromToday(o.orderReadyDate);
-        if (linked.length === 0 && n !== null && n <= -T.readyNoShipmentDays) {
-          actions.push({ tier: 'soon', what: `Request shipment for ${o.orderId}`, why: `Marked ready ${fmtDate(o.orderReadyDate)}, no shipment requested`, ref: o.orderId, go: `openOrderDetail('${o.id}')` });
+        const limit = window.PXUtils.dataQualityThresholds?.readyNoShipmentWorkingDays ?? T.readyNoShipmentDays;
+        const readyAge = window.PXUtils.workingDaysSince ? window.PXUtils.workingDaysSince(o.orderReadyDate, recordEntity(o)) : Math.abs(daysFromToday(o.orderReadyDate));
+        if (linked.length === 0 && readyAge !== null && readyAge > limit) {
+          actions.push({ tier: 'soon', what: `Request shipment for ${o.orderId}`, why: `Marked ready ${readyAge} working day(s) ago, no shipment requested`, ref: o.orderId, go: `openOrderDetail('${o.id}')` });
         }
       }
       // requested receipt date approaching with no completed shipment
@@ -11304,7 +11429,17 @@ function renderOrdersList(type, fn) {
   // Default 'allopen'. Values: allopen | overdue | awaiting | closed.
   const bcView = filters.bcView || 'allopen';
   const _today = new Date();
-  const _isReceived = o => !!(o.deliveryDate || o.actualReceiptDate || (o.receipts && o.receipts.some(r => r.grnCountsAsReceipt)));
+  const _receiptCounts = r => window.PXReceiptControl
+    ? window.PXReceiptControl.grnCountsAsReceipt(r)
+    : !!(r && !['pending', 'cancelled'].includes(String(r.status || '').toLowerCase()) && (r.grnDate || r.actualReceiptDate || r.grnRef || r.grnNumber));
+  const _isReceived = o => {
+    if (o.deliveryDate || o.actualReceiptDate || (Array.isArray(o.receipts) && o.receipts.some(_receiptCounts))) return true;
+    return (state.data.shipments || []).some(s =>
+      !s.archived
+      && window.PXUtils.shipmentBelongsToOrder
+      && window.PXUtils.shipmentBelongsToOrder(s, o)
+      && (s.deliveryDate || s.grnDate));
+  };
   const _isOverdue = o => {
     if (o.isClosed) return false;
     const rr = o.requestedReceiptDate ? new Date(o.requestedReceiptDate) : null;
@@ -12380,6 +12515,18 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
   // Milestones apply to all foreign orders, and to local orders flagged staged-payment.
   let milestonesEnabled = (type === 'foreign') || !!o.stagedPayment;
 
+  function recalcWorkingMilestoneAmounts() {
+    const orderAmount = parseFloat($('#order-amount-input')?.value) || 0;
+    const allocated = window.PXUtils.allocateMilestoneAmounts
+      ? window.PXUtils.allocateMilestoneAmounts(orderAmount, workingMilestones)
+      : [];
+    workingMilestones.forEach((m, idx) => {
+      if (m.rfpRef || m.paidDate) return;
+      const allocatedAmount = allocated[idx];
+      m.amount = allocatedAmount != null ? allocatedAmount : +((orderAmount * (m.percent || 0) / 100).toFixed(2));
+    });
+  }
+
   function renderMilestonePanel() {
     if (!milestonesEnabled) return;
     const container = $('#milestone-panel-container');
@@ -12448,9 +12595,7 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
         const val = e.target.value;
         if (field === 'percent') {
           workingMilestones[idx].percent = parseFloat(val) || 0;
-          // auto-update amount
-          const amt = parseFloat($('#order-amount-input').value) || 0;
-          workingMilestones[idx].amount = +(amt * workingMilestones[idx].percent / 100).toFixed(2);
+          recalcWorkingMilestoneAmounts();
         } else if (field === 'amount') {
           workingMilestones[idx].amount = parseFloat(val) || 0;
         } else if (field === 'expectedDateOverride') {
@@ -12489,10 +12634,7 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
     });
     const recalcBtn = container.querySelector('#recalc-amounts');
     if (recalcBtn) recalcBtn.addEventListener('click', () => {
-      const amt = parseFloat($('#order-amount-input').value) || 0;
-      workingMilestones.forEach(m => {
-        m.amount = +(amt * (m.percent || 0) / 100).toFixed(2);
-      });
+      recalcWorkingMilestoneAmounts();
       renderMilestonePanel();
     });
   }
@@ -12553,10 +12695,7 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
     if (amountInput) {
       amountInput.addEventListener('input', () => {
         if (!milestonesEnabled) return;
-        const amt = parseFloat(amountInput.value) || 0;
-        workingMilestones.forEach(m => {
-          m.amount = +(amt * (m.percent || 0) / 100).toFixed(2);
-        });
+        recalcWorkingMilestoneAmounts();
         renderMilestonePanel();
       });
     }
@@ -12763,12 +12902,15 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
         }
       }
       // Strip helper undefined fields, normalize
+      const milestoneAllocatedAmounts = window.PXUtils.milestoneAmountsLookPercentDerived && window.PXUtils.milestoneAmountsLookPercentDerived(data.amount, workingMilestones)
+        ? window.PXUtils.allocateMilestoneAmounts(data.amount, workingMilestones)
+        : null;
       data.milestones = workingMilestones.map((m, idx) => ({
         id: m.id || 'm_' + Date.now() + '_' + idx,
         seq: idx + 1,
         label: m.label || '',
         percent: parseFloat(m.percent) || 0,
-        amount: parseFloat(m.amount) || 0,
+        amount: milestoneAllocatedAmounts ? milestoneAllocatedAmounts[idx] : (parseFloat(m.amount) || 0),
         anchor: m.anchor || null,
         offset: parseInt(m.offset) || 0,
         expectedDateOverride: m.expectedDateOverride || null,
@@ -14434,7 +14576,8 @@ window.__saveLineControl = async function (orderId, lineKeyEnc) {
   const addingReceipt = !isNaN(qty) && qty > 0;
   if (addingReceipt) {
     if (l.received + qty > (l.ordered - l.cancelled) + 0.0001 && !exc) { toast('Received exceeds ordered — tick the over-receipt exception to proceed.', 'error'); return; }
-    if (!ref && !date) { toast('Enter a GRN reference or receipt date for the receipt.', 'error'); return; }
+    if (!ref) { toast('Enter the GRN reference for the receipt.', 'error'); return; }
+    if (!date) { toast('Enter the GRN date for the receipt.', 'error'); return; }
     receipts.push({ receiptId: 'R' + Date.now().toString(36), lineId: lineKey, shipmentId: ship || null, grnRef: ref || null, grnNumber: ref || null, grnDate: date || null, receivedQty: qty, status: 'fully received', exceptionApproved: !!exc, exceptionReason: exc ? excReason : null, exceptionApprovedBy: exc ? (state.officer?.code || '') : null, notes: null, recordedBy: (state.officer?.code || ''), recordedAt: new Date().toISOString() });
   }
   const tracking = Array.isArray(o.lineTracking) ? o.lineTracking.slice() : [];
@@ -15840,7 +15983,8 @@ window.openShipmentForm = function(shipId = null, orderId = '', supplier = '', o
     // Soft duplicate warning for shipment ID reuse
     const shipDupW = checkShipmentDuplicates(data, state.data.shipments, isEdit, isEdit ? shipId : null);
     if (shipDupW.length) {
-      if (!confirm('Possible duplicate:\n\n• ' + shipDupW.join('\n• ') + '\n\nSave anyway?')) return;
+      toast(shipDupW[0], 'danger');
+      return;
     }
     // Validate the linked order actually exists
     const linkedOrder = state.data.orders.find(ord => ord.orderId === data.orderId);
@@ -16909,7 +17053,11 @@ function buildPaymentsForecast(opts) {
     const ent = recordEntity(o);
     if (entityFilter && ent !== entityFilter) return;
 
-    o.milestones.forEach(m => {
+    const allocatedAmounts = window.PXUtils.milestoneAmountsLookPercentDerived && window.PXUtils.milestoneAmountsLookPercentDerived(o.amount, o.milestones)
+      ? window.PXUtils.allocateMilestoneAmounts(o.amount, o.milestones)
+      : null;
+
+    o.milestones.forEach((m, idx) => {
       if (m.paidDate) return;                         // already paid → not forthcoming
       // Real expected date if the anchor data is available
       let realDate = null;
@@ -16924,7 +17072,8 @@ function buildPaymentsForecast(opts) {
 
       const forecastDate = realDate || estimatedDate;
       const isEstimate = !realDate && !!estimatedDate;
-      const amount = (m.amount != null) ? Number(m.amount)
+      const amount = allocatedAmounts ? allocatedAmounts[idx]
+                     : (m.amount != null) ? Number(m.amount)
                      : (o.amount != null && m.percent != null) ? +(Number(o.amount) * m.percent / 100).toFixed(2)
                      : null;
       const dd = forecastDate ? (() => { const x = new Date(forecastDate); x.setHours(0,0,0,0); return x; })() : null;
@@ -17448,9 +17597,13 @@ window.openPaymentForm = async function(payId = null, orderIdPrefill = null, mil
       p.description = ord.description;
       // If milestone specified, prefill amount/date from milestone instead of order
       if (milestoneIdPrefill && ord.milestones) {
-        prefillMilestone = ord.milestones.find(m => m.id === milestoneIdPrefill);
+        const milestoneIndex = ord.milestones.findIndex(m => m.id === milestoneIdPrefill);
+        prefillMilestone = milestoneIndex >= 0 ? ord.milestones[milestoneIndex] : null;
         if (prefillMilestone) {
-          p.amount = prefillMilestone.amount;
+          const allocatedAmounts = window.PXUtils.milestoneAmountsLookPercentDerived && window.PXUtils.milestoneAmountsLookPercentDerived(ord.amount, ord.milestones)
+            ? window.PXUtils.allocateMilestoneAmounts(ord.amount, ord.milestones)
+            : null;
+          p.amount = allocatedAmounts ? allocatedAmounts[milestoneIndex] : prefillMilestone.amount;
           p.milestoneId = prefillMilestone.id;
           p.milestoneLabel = prefillMilestone.label;
           // due date = milestone's computed expected date, falling back to override
@@ -21911,9 +22064,10 @@ window.__purgeCancel = () => { _purgeCancel = true; };
 async function purgeAllData(opts = {}) {
   // Hard guard on the most destructive action (defense in depth — the button is also
   // hidden outside demo mode): never runs in production, and only for an admin.
-  const demo = !(window.__isDemoMode) || window.__isDemoMode();
+  const demo = !!(window.__isDemoMode && window.__isDemoMode());
+  const enabled = !!(window.REF && window.REF.demoResetEnabled);
   const role = (window.PXUtils && window.PXUtils.currentRole) ? window.PXUtils.currentRole() : 'admin';
-  if (!demo || role !== 'admin') {
+  if (!demo || !enabled || role !== 'admin') {
     if (window.PXUtils && window.PXUtils.toast) window.PXUtils.toast('Clearing all data is disabled in this environment.', 'danger');
     throw new Error('purgeAllData is not permitted here.');
   }

@@ -342,9 +342,10 @@ function myWorkCompute(opts) {
       // foreign order ready but no shipment requested
       if (orderNeedsShipment(o) && o.orderReadyDate) {
         const linked = ships.filter(s => s.orderId === o.orderId);
-        const n = daysFromToday(o.orderReadyDate);
-        if (linked.length === 0 && n !== null && n <= -T.readyNoShipmentDays) {
-          actions.push({ tier: 'soon', what: `Request shipment for ${o.orderId}`, why: `Marked ready ${fmtDate(o.orderReadyDate)}, no shipment requested`, ref: o.orderId, go: `openOrderDetail('${o.id}')` });
+        const limit = window.PXUtils.dataQualityThresholds?.readyNoShipmentWorkingDays ?? T.readyNoShipmentDays;
+        const readyAge = window.PXUtils.workingDaysSince ? window.PXUtils.workingDaysSince(o.orderReadyDate, recordEntity(o)) : Math.abs(daysFromToday(o.orderReadyDate));
+        if (linked.length === 0 && readyAge !== null && readyAge > limit) {
+          actions.push({ tier: 'soon', what: `Request shipment for ${o.orderId}`, why: `Marked ready ${readyAge} working day(s) ago, no shipment requested`, ref: o.orderId, go: `openOrderDetail('${o.id}')` });
         }
       }
       // requested receipt date approaching with no completed shipment

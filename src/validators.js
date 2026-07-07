@@ -19,6 +19,7 @@
   const num = v => (v === '' || v === null || v === undefined) ? null : Number(v);
   const isNum = v => v !== null && v !== '' && v !== undefined && !isNaN(Number(v));
   const toDate = v => { if (!v) return null; const d = v.toDate ? v.toDate() : new Date(v); return isNaN(d) ? null : d; };
+  const norm = v => String(v || '').trim().toLowerCase();
 
   // Basic link safety: allow http(s), SharePoint/OneDrive, and plain file paths.
   // Block javascript:, data:, and obviously malformed values.
@@ -77,6 +78,29 @@
     if (Array.isArray(data.milestones) && data.milestones.length) {
       const sum = data.milestones.reduce((s, m) => s + (Number(m.percent) || 0), 0);
       if (Math.round(sum) !== 100) completeness.push(`Milestone percentages total ${sum}% (must equal 100%).` + histSuffix);
+      if (isNum(data.amount)) {
+        const milestoneAmount = data.milestones.reduce((s, m) => s + (Number(m.amount) || 0), 0);
+        if (Math.abs(milestoneAmount - Number(data.amount)) > 0.05) {
+          warnings.push(`Milestone amounts total ${milestoneAmount.toFixed(2)}, which does not reconcile to the order amount ${Number(data.amount).toFixed(2)}.`);
+        }
+      }
+    }
+    if (Array.isArray(data.receipts) && data.receipts.length) {
+      const shipments = state().data.shipments || [];
+      data.receipts.forEach((receipt, index) => {
+        const status = norm(receipt?.status || 'fully received');
+        const activeReceipt = status !== 'pending' && status !== 'cancelled';
+        if (activeReceipt && !(receipt?.grnDate || receipt?.actualReceiptDate)) {
+          warnings.push(`GRN row ${index + 1} has no receipt date; OTIF and ageing reports may treat it as incomplete.`);
+        }
+        if (receipt?.shipmentId) {
+          const linked = shipments.find(s => String(s.id || '') === String(receipt.shipmentId) || String(s.shipmentId || '') === String(receipt.shipmentId));
+          if (!linked) warnings.push(`GRN row ${index + 1} links to a shipment that is not currently present.`);
+          else if (String(linked.orderId || '') !== String(data.orderId || '')) {
+            errors.push(`GRN row ${index + 1} links to shipment ${linked.shipmentId || linked.id}, which belongs to order ${linked.orderId || 'unknown'}.`);
+          }
+        }
+      });
     }
     // Requested receipt date sanity
     const od = toDate(data.dateOfOrder), rr = toDate(data.requestedReceiptDate);
@@ -119,6 +143,36 @@
   function validateShipment(data, existing) {
     const errors = [], warnings = [];
     if (!data.orderId) errors.push('Shipment must be linked to an order.');
+    if (!data.shipmentId || !String(data.shipmentId).trim()) errors.push('Shipment ID is required.');
+    if (!data.status || !String(data.status).trim()) errors.push('Shipment status is required.');
+    const validStatuses = window.REF?.shipmentFollowupStatuses || [];
+    if (data.status && validStatuses.length && !validStatuses.includes(data.status)) {
+      warnings.push(`Shipment status "${data.status}" is not in the current logistics status list.`);
+    }
+    const currentId = existing?.id || data.id || null;
+    const duplicate = (state().data.shipments || []).find(sh =>
+      sh && sh.id !== currentId && norm(sh.shipmentId) === norm(data.shipmentId));
+    if (duplicate) errors.push(`Shipment ID "${data.shipmentId}" is already in use on order ${duplicate.orderId || 'unknown'}.`);
+
+    const validReceiptResults = window.REF?.shipmentReceiptResults || [];
+    if (data.receiptResult && validReceiptResults.length && !validReceiptResults.includes(data.receiptResult)) {
+      errors.push(`Receipt result "${data.receiptResult}" is not valid.`);
+    }
+    const receivedResults = ['fully received', 'partially received', 'short received', 'missing goods', 'damaged goods', 'over received'];
+    const shipmentKeys = [existing?.id, data.id, existing?.shipmentId, data.shipmentId].filter(Boolean).map(String);
+    const linkedOrder = (state().data.orders || []).find(o => String(o.orderId || '') === String(data.orderId || ''));
+    const hasLinkedGrnDate = !!(linkedOrder && Array.isArray(linkedOrder.receipts) && linkedOrder.receipts.some(receipt => {
+      const status = norm(receipt?.status || 'fully received');
+      return status !== 'pending' && status !== 'cancelled'
+        && shipmentKeys.includes(String(receipt.shipmentId || ''))
+        && !!(receipt.grnDate || receipt.actualReceiptDate);
+    }));
+    if (receivedResults.includes(norm(data.receiptResult)) && !data.grnDate && !hasLinkedGrnDate) {
+      errors.push('Receipt result shows goods were received, but no GRN date or linked GRN is recorded.');
+    }
+    if (data.grnNumber && !data.grnDate && !hasLinkedGrnDate) {
+      errors.push('GRN number is set but no GRN date or linked GRN date is recorded.');
+    }
     const eta = toDate(data.eta), grn = toDate(data.grnDate), etd = toDate(data.etd);
     if (etd && eta && eta < etd) errors.push('ETA cannot be before ETD.');
     if (eta && grn && grn < eta) errors.push('GRN (goods received) date cannot be before the ETA — goods cannot be received before they arrive.');

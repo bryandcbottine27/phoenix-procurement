@@ -87,7 +87,11 @@ function buildPaymentsForecast(opts) {
     const ent = recordEntity(o);
     if (entityFilter && ent !== entityFilter) return;
 
-    o.milestones.forEach(m => {
+    const allocatedAmounts = window.PXUtils.milestoneAmountsLookPercentDerived && window.PXUtils.milestoneAmountsLookPercentDerived(o.amount, o.milestones)
+      ? window.PXUtils.allocateMilestoneAmounts(o.amount, o.milestones)
+      : null;
+
+    o.milestones.forEach((m, idx) => {
       if (m.paidDate) return;                         // already paid → not forthcoming
       // Real expected date if the anchor data is available
       let realDate = null;
@@ -102,7 +106,8 @@ function buildPaymentsForecast(opts) {
 
       const forecastDate = realDate || estimatedDate;
       const isEstimate = !realDate && !!estimatedDate;
-      const amount = (m.amount != null) ? Number(m.amount)
+      const amount = allocatedAmounts ? allocatedAmounts[idx]
+                     : (m.amount != null) ? Number(m.amount)
                      : (o.amount != null && m.percent != null) ? +(Number(o.amount) * m.percent / 100).toFixed(2)
                      : null;
       const dd = forecastDate ? (() => { const x = new Date(forecastDate); x.setHours(0,0,0,0); return x; })() : null;

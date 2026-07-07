@@ -320,7 +320,8 @@
     }
 
     const readyAge = workingSince(order.orderReadyDate, entity);
-    if (!isClosed(order) && needsShipment(order) && order.orderReadyDate && !ships.length && readyAge !== null && readyAge >= 0) {
+    const readyNoShipmentLimit = Number.isFinite(Number(dq.readyNoShipmentWorkingDays)) ? Number(dq.readyNoShipmentWorkingDays) : 2;
+    if (!isClosed(order) && needsShipment(order) && order.orderReadyDate && !ships.length && readyAge !== null && readyAge > readyNoShipmentLimit) {
       add('ready-no-shipment', 'warn', `Goods are ready but no shipment has been requested (${readyAge} working day(s)).`, 15);
     }
 

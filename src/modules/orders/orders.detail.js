@@ -948,7 +948,8 @@ window.__saveLineControl = async function (orderId, lineKeyEnc) {
   const addingReceipt = !isNaN(qty) && qty > 0;
   if (addingReceipt) {
     if (l.received + qty > (l.ordered - l.cancelled) + 0.0001 && !exc) { toast('Received exceeds ordered — tick the over-receipt exception to proceed.', 'error'); return; }
-    if (!ref && !date) { toast('Enter a GRN reference or receipt date for the receipt.', 'error'); return; }
+    if (!ref) { toast('Enter the GRN reference for the receipt.', 'error'); return; }
+    if (!date) { toast('Enter the GRN date for the receipt.', 'error'); return; }
     receipts.push({ receiptId: 'R' + Date.now().toString(36), lineId: lineKey, shipmentId: ship || null, grnRef: ref || null, grnNumber: ref || null, grnDate: date || null, receivedQty: qty, status: 'fully received', exceptionApproved: !!exc, exceptionReason: exc ? excReason : null, exceptionApprovedBy: exc ? (state.officer?.code || '') : null, notes: null, recordedBy: (state.officer?.code || ''), recordedAt: new Date().toISOString() });
   }
   const tracking = Array.isArray(o.lineTracking) ? o.lineTracking.slice() : [];

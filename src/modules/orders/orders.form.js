@@ -440,6 +440,18 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
   // Milestones apply to all foreign orders, and to local orders flagged staged-payment.
   let milestonesEnabled = (type === 'foreign') || !!o.stagedPayment;
 
+  function recalcWorkingMilestoneAmounts() {
+    const orderAmount = parseFloat($('#order-amount-input')?.value) || 0;
+    const allocated = window.PXUtils.allocateMilestoneAmounts
+      ? window.PXUtils.allocateMilestoneAmounts(orderAmount, workingMilestones)
+      : [];
+    workingMilestones.forEach((m, idx) => {
+      if (m.rfpRef || m.paidDate) return;
+      const allocatedAmount = allocated[idx];
+      m.amount = allocatedAmount != null ? allocatedAmount : +((orderAmount * (m.percent || 0) / 100).toFixed(2));
+    });
+  }
+
   function renderMilestonePanel() {
     if (!milestonesEnabled) return;
     const container = $('#milestone-panel-container');
@@ -508,9 +520,7 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
         const val = e.target.value;
         if (field === 'percent') {
           workingMilestones[idx].percent = parseFloat(val) || 0;
-          // auto-update amount
-          const amt = parseFloat($('#order-amount-input').value) || 0;
-          workingMilestones[idx].amount = +(amt * workingMilestones[idx].percent / 100).toFixed(2);
+          recalcWorkingMilestoneAmounts();
         } else if (field === 'amount') {
           workingMilestones[idx].amount = parseFloat(val) || 0;
         } else if (field === 'expectedDateOverride') {
@@ -549,10 +559,7 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
     });
     const recalcBtn = container.querySelector('#recalc-amounts');
     if (recalcBtn) recalcBtn.addEventListener('click', () => {
-      const amt = parseFloat($('#order-amount-input').value) || 0;
-      workingMilestones.forEach(m => {
-        m.amount = +(amt * (m.percent || 0) / 100).toFixed(2);
-      });
+      recalcWorkingMilestoneAmounts();
       renderMilestonePanel();
     });
   }
@@ -613,10 +620,7 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
     if (amountInput) {
       amountInput.addEventListener('input', () => {
         if (!milestonesEnabled) return;
-        const amt = parseFloat(amountInput.value) || 0;
-        workingMilestones.forEach(m => {
-          m.amount = +(amt * (m.percent || 0) / 100).toFixed(2);
-        });
+        recalcWorkingMilestoneAmounts();
         renderMilestonePanel();
       });
     }
@@ -823,12 +827,15 @@ window.openOrderForm = function(orderId = null, type = 'foreign', fn = null) {
         }
       }
       // Strip helper undefined fields, normalize
+      const milestoneAllocatedAmounts = window.PXUtils.milestoneAmountsLookPercentDerived && window.PXUtils.milestoneAmountsLookPercentDerived(data.amount, workingMilestones)
+        ? window.PXUtils.allocateMilestoneAmounts(data.amount, workingMilestones)
+        : null;
       data.milestones = workingMilestones.map((m, idx) => ({
         id: m.id || 'm_' + Date.now() + '_' + idx,
         seq: idx + 1,
         label: m.label || '',
         percent: parseFloat(m.percent) || 0,
-        amount: parseFloat(m.amount) || 0,
+        amount: milestoneAllocatedAmounts ? milestoneAllocatedAmounts[idx] : (parseFloat(m.amount) || 0),
         anchor: m.anchor || null,
         offset: parseInt(m.offset) || 0,
         expectedDateOverride: m.expectedDateOverride || null,

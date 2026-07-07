@@ -210,8 +210,8 @@ closure decisions.
 `PXValidators.validate(kind, data, existing)` returns `{ ok, errors, warnings }`.
 - **errors block** the save; **warnings ask "save anyway?"**.
 - Wired into every form save **and** enforced again inside `PXStore` (safety net).
-- **Hard errors (always genuinely invalid):** amount non-numeric or negative, unsafe document links (`javascript:`/`data:`), and impossible date orderings — GRN before ETA, ETA before ETD, expiry before received, and order acknowledged / ready / requested-receipt dates before the order date.
-- **Warnings (judgment calls — confirm to proceed):** supplier not in master list, milestones ≠ 100%, payment exceeds order value, closing an order with open issues or missing expected documents, backwards status moves.
+- **Hard errors (always genuinely invalid):** amount non-numeric or negative, duplicate shipment references, missing shipment status, unsafe document links (`javascript:`/`data:`), receipt result without a GRN date/link, and impossible date orderings — GRN before ETA, ETA before ETD, expiry before received, and order acknowledged / ready / requested-receipt dates before the order date.
+- **Warnings (judgment calls — confirm to proceed):** supplier not in master list, milestones ≠ 100% or amounts not reconciling, payment exceeds order value, closing an order with open issues or missing expected documents, backwards status moves, and historical GRN rows missing receipt dates.
 - **TEPS tax-provision inputs (used by A/C for cash provisioning):** *errors* — negative invoiceValue / tepsFreight / insuranceRate / vatRate / exciseDuties, and exchangeRate ≤ 0; *warnings* — alcohol ticked but excise blank/0, invoice value without an exchange rate (CFR understated), and a provision with no meaningful basis (no invoice/freight/excise).
 - The split is deliberate: block only data that is never legitimate; let the user confirm everything else.
 
@@ -285,7 +285,7 @@ For each unpaid milestone (`paidDate` empty):
 - **forecastDate** = real `computeMilestoneDate(...)` if anchor data exists, else an
   **estimate** by anchor priority: `requestedReceiptDate` → `orderReadyDate` →
   `dateOfOrder + REF.forecastDefaultLeadDays` (60). Estimated rows tagged `est.`.
-- **amount** = milestone amount, or `order.amount × percent/100`.
+- **amount** = milestone amount, or the shared percentage allocator. When percentages total 100% and amounts are percent-derived, the final milestone absorbs rounding so the forecast reconciles to the PO total.
 - flags `rfpRaised` when an RFP exists but isn't paid; marks `overdue` when past due.
 
 Entity-aware (follows the sidebar switcher); currency summary pills; time-band filter chips
@@ -751,8 +751,8 @@ records are a controlled exception: `Currency Code` corrects local/foreign, whil
 - **Preserve Phoenix data on update:** updates patch only `ERP_OWNED_UPDATE_FIELDS`; status,
   milestones, noShipment, stagedPayment, notes, follow-ups, etc. are never touched.
 
-**4. Demo reset safeguard.** `REF.demoResetEnabled` is only for isolated demo reset testing. The "Clear all data"
-Danger Zone renders only when demo mode is active, `demoResetEnabled` is true, and `currentRole()==='admin'`. The purge requires
+**4. Demo reset safeguard.** `REF.demoResetEnabled` is disabled by default and is only for isolated demo reset testing. The "Clear all data"
+Danger Zone renders only when demo mode is active, `demoResetEnabled` is true, and `currentRole()==='admin'`. The direct purge function also checks this flag. The purge requires
 a successful **Backup All** in the session (`window.__backupDoneAt`, set by the JSON/CSV backup)
 — the panel shows a "Run Backup All now" button and keeps the **Permanently delete** button
 disabled until both the backup is done and `DELETE ALL` is typed. Must be left disabled (or the
@@ -1182,7 +1182,7 @@ daily follow-up controls. `workingDaysBetween`, `workingDaysSince`, and `working
 weekends and the approved holiday dates entered for the relevant entity in **System Settings → Working
 Calendars**. Holidays are deliberately maintained by an administrator rather than inferred from a
 country calendar, because public and company closure dates must be confirmed locally. The central `dataQualityThresholds`
-object currently applies: acknowledgement 3 working days, no order activity 5, shipment without
+object currently applies: acknowledgement 3 working days, no order activity 5, ready-without-shipment 2, shipment without
 ETD 5, ETA clearance readiness 7, port-arrival clearance start 3, clearance delay 5, release to
 delivery 7, delivery to GRN 2, payment draft/submitted 2, payment due look-ahead 7, and ERP sync
 freshness 3. These thresholds are deliberately easy to change in one place.

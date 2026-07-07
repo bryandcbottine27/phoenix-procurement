@@ -106,8 +106,8 @@ const REF = {
      The permanent "Clear all data" purge is a DEMO-ONLY tool for resetting an
      isolated demo Firestore. It is hidden unless this flag is true AND the current
      officer is admin, and it requires a successful "Backup All" first.
-     MUST be left false (or the purge code removed) before any pilot/production use. */
-  demoResetEnabled: true,
+     MUST be left false (or the purge code removed) before any shared pilot/production use. */
+  demoResetEnabled: false,
 
   categories: [
     "RM - Ingredients", "Primary Packaging", "Secondary Packaging", "Finished Products",
@@ -395,7 +395,7 @@ const REF = {
     upcomingDays: 30,        // within this many days = "Upcoming" (yellow)
     noAckDays: 7,            // order older than this with no supplier acknowledgement
     arrivedNoGrnGraceDays: 0,// ETA passed by this many days and still no GRN = action
-    readyNoShipmentDays: 0,  // order ready this many days ago but no shipment requested
+    readyNoShipmentDays: 2,  // order ready more than this many working days ago but no shipment requested
     requestedNotAssignedDays: 0 // shipment requested this many days ago, still unassigned
   },
   // Fallback lead time (days from order date) used ONLY to estimate a milestone's
@@ -1128,7 +1128,15 @@ function shipmentFollowupActionOpen(shipment, data = state.data) {
     return !hasIssue;
   }
   if (action === "Await GRN / store confirmation") {
-    return !(shipment.grnDate || ["Fully received", "Partially received", "Short received", "Missing goods", "Damaged goods", "Over received"].includes(shipment.receiptResult || ""));
+    const order = shipment.orderId ? (data.orders || []).find(o => o.orderId === shipment.orderId) : null;
+    const keys = [shipment.id, shipment.shipmentId].filter(Boolean).map(String);
+    const linkedGrn = order && Array.isArray(order.receipts) && order.receipts.some(receipt => {
+      const status = String(receipt?.status || '').toLowerCase();
+      return status !== 'pending' && status !== 'cancelled'
+        && keys.includes(String(receipt.shipmentId || ''))
+        && !!(receipt.grnDate || receipt.actualReceiptDate);
+    });
+    return !(shipment.grnDate || linkedGrn);
   }
   return true;
 }
@@ -2313,6 +2321,7 @@ window.PXUtils = {
   collection, doc, addDoc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy,
   limit, serverTimestamp, runTransaction, getDocs,
   // milestone helpers added below
+  allocateMilestoneAmounts, milestoneAmountsLookPercentDerived,
   generateMilestonesFromTerm, computeMilestoneDate, milestoneStatus,
   // function helpers
   orderFunction, functionForCategory, orderNeedsShipment,
@@ -3102,16 +3111,57 @@ function orderNeedsShipment(o) {
    These convert a payment term string + the order/shipment context
    into an array of milestone objects with expected dates filled in.
 ============================================================ */
+function roundMoneyAmount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+function allocateMilestoneAmounts(orderAmount, milestones) {
+  const amount = Number(orderAmount);
+  const items = Array.isArray(milestones) ? milestones : [];
+  if (!Number.isFinite(amount) || !items.length) return items.map(() => null);
+  const totalPct = items.reduce((sum, item) => sum + (Number(item?.percent) || 0), 0);
+  const rebalanceFinal = Math.abs(totalPct - 100) <= 0.01;
+  const totalCents = Math.round((amount + Number.EPSILON) * 100);
+  let allocatedCents = 0;
+  return items.map((item, idx) => {
+    const percent = Number(item?.percent) || 0;
+    let cents;
+    if (rebalanceFinal && idx === items.length - 1) {
+      cents = totalCents - allocatedCents;
+    } else {
+      cents = Math.round(totalCents * percent / 100);
+      allocatedCents += cents;
+    }
+    return cents / 100;
+  });
+}
+
+function milestoneAmountsLookPercentDerived(orderAmount, milestones) {
+  const amount = Number(orderAmount);
+  const items = Array.isArray(milestones) ? milestones : [];
+  if (!Number.isFinite(amount) || !items.length) return false;
+  const totalPct = items.reduce((sum, item) => sum + (Number(item?.percent) || 0), 0);
+  if (Math.abs(totalPct - 100) > 0.01) return false;
+  return items.every(item => {
+    if (item?.amount == null || item.amount === '') return true;
+    const expected = roundMoneyAmount(amount * (Number(item?.percent) || 0) / 100);
+    return expected != null && Math.abs(Number(item.amount) - expected) <= 0.011;
+  });
+}
+
 function generateMilestonesFromTerm(termString, orderAmount) {
   if (!termString) return [];
   const schedule = REF.paymentSchedules[termString];
   if (!schedule) return []; // custom/unknown term — user builds manually
+  const amounts = allocateMilestoneAmounts(orderAmount, schedule);
   return schedule.map((stage, idx) => ({
     id: 'm' + (idx + 1) + '_' + Math.random().toString(36).slice(2, 7),
     seq: idx + 1,
     label: stage.label,
     percent: stage.percent,
-    amount: orderAmount ? +(orderAmount * stage.percent / 100).toFixed(2) : null,
+    amount: amounts[idx],
     anchor: stage.anchor,
     offset: stage.offset,
     expectedDate: null,   // computed dynamically when order/shipment dates change
@@ -3143,15 +3193,33 @@ function computeMilestoneDate(milestone, order, ships) {
       }
       return null;
     case 'bl_date':
-    case 'eta':
-    case 'grn_date': {
+    case 'eta': {
       // Earliest matching shipment date
       const matchingShips = ships.filter(s => shipmentBelongsToOrder(s, order));
       if (matchingShips.length === 0) return null;
-      const field = milestone.anchor === 'bl_date' ? 'blDate' : milestone.anchor === 'eta' ? 'eta' : 'grnDate';
+      const field = milestone.anchor === 'bl_date' ? 'blDate' : 'eta';
       const dates = matchingShips.map(s => s[field]).filter(Boolean).map(d => d.toDate ? d.toDate() : new Date(d));
       if (dates.length === 0) return null;
       anchorDate = new Date(Math.min(...dates.map(d => d.getTime())));
+      break;
+    }
+    case 'grn_date': {
+      const dates = [];
+      const matchingShips = (ships || []).filter(s => shipmentBelongsToOrder(s, order));
+      matchingShips.forEach(s => {
+        const receiptDate = window.PXReceiptControl
+          ? window.PXReceiptControl.shipmentReceiptDate(order, s)
+          : (s.deliveryDate || s.grnDate);
+        if (receiptDate) dates.push(receiptDate);
+      });
+      (Array.isArray(order.receipts) ? order.receipts : []).forEach(r => {
+        const status = String(r?.status || '').toLowerCase();
+        if (status === 'pending' || status === 'cancelled') return;
+        if (!r.shipmentId && (r.actualReceiptDate || r.grnDate)) dates.push(r.actualReceiptDate || r.grnDate);
+      });
+      const parsed = dates.map(d => d?.toDate ? d.toDate() : new Date(d)).filter(d => d && !isNaN(d));
+      if (parsed.length === 0) return null;
+      anchorDate = new Date(Math.min(...parsed.map(d => d.getTime())));
       break;
     }
     case 'erection': anchorDate = order.erectionDate; break;

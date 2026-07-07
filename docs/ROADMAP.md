@@ -61,7 +61,9 @@ Scope:
 - Test dashboard Role Center per entity.
 - Test order detail/card page.
 - Test shipment detail and shipment GRN linkage.
+- Test shipment integrity guards: duplicate shipment references blocked, status required, received result requires a GRN date or linked GRN, and order-level GRN links cannot point to another order's shipment.
 - Test payment visibility versus payment creation for view-only roles.
+- Test milestone schedules with rounding-sensitive percentages and confirm the forecast/RFP prefill reconciles to the PO amount.
 - Test My Work item disappears after the source action is processed.
 - Test production password mode in a staged build.
 
@@ -71,6 +73,8 @@ Acceptance criteria:
 - Filter button remains visible when filter pane is open.
 - View-only users cannot create payment requests.
 - Stakeholders can request updates where allowed, but cannot edit restricted records.
+- Ready-without-shipment alerts do not appear until the shared 2-working-day grace period has passed.
+- Received orders with order-level or shipment-linked GRNs do not remain in Awaiting/Overdue list filters.
 - Processed My Work actions no longer show as unattended.
 - Build passes after any fixes.
 
