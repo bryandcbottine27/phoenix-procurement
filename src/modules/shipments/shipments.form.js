@@ -40,6 +40,8 @@ window.openShipmentForm = function(shipId = null, orderId = '', supplier = '', o
         receiptResult: 'Not received yet'
       };
   if (!s) { toast('Shipment not found', 'danger'); return; }
+  // Snapshot the record version at open time, to detect another officer saving first.
+  const loadedUpdatedAt = isEdit ? (s.updatedAt || null) : null;
 
   // Permission: only logistics + admin may open the editable form at all
   if (!canEditShipments()) {
@@ -704,7 +706,7 @@ window.openShipmentForm = function(shipId = null, orderId = '', supplier = '', o
       // Inherit entity from the linked order (shipments belong to an order's entity)
       if (!data.entity) { const lo = state.data.orders.find(o => o.orderId === data.orderId); data.entity = lo ? recordEntity(lo) : currentEntity(); }
       if (isEdit) {
-        await window.PXStore.updateRecord('shipments', shipId, data);
+        await window.PXStore.updateRecord('shipments', shipId, data, { expectedUpdatedAt: loadedUpdatedAt });
         toast('Shipment updated', 'success');
       } else {
         const sourceShipment = priorCreateNextSource(data);
@@ -722,7 +724,11 @@ window.openShipmentForm = function(shipId = null, orderId = '', supplier = '', o
       window.closeModal();
     } catch (err) {
       console.error(err);
-      toast('Save failed: ' + err.message, 'danger');
+      if (err && err.code === 'STALE_WRITE') {
+        toast('This shipment was changed by someone else while you had it open. Your changes were not saved — please close, reopen the shipment to see the latest, and re-apply your edits.', 'danger');
+      } else {
+        toast('Save failed: ' + err.message, 'danger');
+      }
       $('#save-ship-btn').disabled = false;
       $('#save-ship-btn').innerHTML = isEdit ? 'Save Changes' : 'Create Shipment';
     }

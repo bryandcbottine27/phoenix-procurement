@@ -21,6 +21,8 @@ window.openPaymentForm = async function(payId = null, orderIdPrefill = null, mil
   }
   const p = isEdit ? state.data.payments.find(x => x.id === payId) : { status: 'draft', currency: 'EUR' };
   if (!p) { toast('Payment request not found', 'danger'); return; }
+  // Snapshot the record version at open time, to detect another officer saving first.
+  const loadedUpdatedAt = isEdit ? (p.updatedAt || null) : null;
 
   let prefillMilestone = null;
   if (!isEdit && orderIdPrefill) {
@@ -254,7 +256,7 @@ window.openPaymentForm = async function(payId = null, orderIdPrefill = null, mil
       let rfpRefForSync = data.rfpRef;
       let savedId = payId;
       if (isEdit) {
-        await window.PXStore.updateRecord('payment_requests', payId, data);
+        await window.PXStore.updateRecord('payment_requests', payId, data, { expectedUpdatedAt: loadedUpdatedAt });
         toast('Payment request updated', 'success');
       } else {
         if (!data.rfpRef) data.rfpRef = await nextRfpRef(payEntity);
@@ -279,7 +281,11 @@ window.openPaymentForm = async function(payId = null, orderIdPrefill = null, mil
       window.closeModal();
     } catch (err) {
       console.error(err);
-      toast('Save failed: ' + err.message, 'danger');
+      if (err && err.code === 'STALE_WRITE') {
+        toast('This payment request was changed by someone else while you had it open. Your changes were not saved — please close, reopen the RFP to see the latest, and re-apply your edits.', 'danger');
+      } else {
+        toast('Save failed: ' + err.message, 'danger');
+      }
       $('#save-pay-btn').disabled = false;
       $('#save-pay-btn').innerHTML = isEdit ? 'Save Changes' : 'Create RFP';
     }

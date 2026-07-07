@@ -216,6 +216,28 @@ check('shipmentSequence still parses legacy letter suffixes',
   sequenceSandbox.shipmentSequence({ orderId: 'FPO-SEQ', shipmentId: 'FPO-SEQ C' }) === 3);
 
 const paymentsRender = read('src/modules/payments/payments.render.js');
+const shipmentsForm = read('src/modules/shipments/shipments.form.js');
+const paymentsForm = read('src/modules/payments/payments.form.js');
+const shipmentProcessedBlock = shipmentsForm.slice(
+  shipmentsForm.indexOf("followupActionStatus: 'processed'"),
+  shipmentsForm.indexOf("toast('Shipment created and linked", shipmentsForm.indexOf("followupActionStatus: 'processed'"))
+);
+check('shipment edit form captures loaded updatedAt for stale-write guard',
+  /const\s+loadedUpdatedAt\s*=\s*isEdit\s*\?\s*\(s\.updatedAt\s*\|\|\s*null\)\s*:\s*null/.test(shipmentsForm));
+check('shipment edit form passes expectedUpdatedAt on the primary update',
+  /updateRecord\('shipments',\s*shipId,\s*data,\s*\{\s*expectedUpdatedAt:\s*loadedUpdatedAt\s*\}\)/.test(shipmentsForm));
+check('shipment edit form handles STALE_WRITE inline',
+  /err\s*&&\s*err\.code\s*===\s*'STALE_WRITE'/.test(shipmentsForm));
+check('shipment follow-up linkage write is not stale-write guarded',
+  shipmentProcessedBlock && !shipmentProcessedBlock.includes('expectedUpdatedAt'));
+check('payment edit form captures loaded updatedAt for stale-write guard',
+  /const\s+loadedUpdatedAt\s*=\s*isEdit\s*\?\s*\(p\.updatedAt\s*\|\|\s*null\)\s*:\s*null/.test(paymentsForm));
+check('payment edit form passes expectedUpdatedAt on the form update',
+  /updateRecord\('payment_requests',\s*payId,\s*data,\s*\{\s*expectedUpdatedAt:\s*loadedUpdatedAt\s*\}\)/.test(paymentsForm));
+check('payment edit form handles STALE_WRITE inline',
+  /err\s*&&\s*err\.code\s*===\s*'STALE_WRITE'/.test(paymentsForm));
+check('payment render inline status toggles do not use expectedUpdatedAt',
+  !paymentsRender.includes('expectedUpdatedAt'));
 check('payment approval updates use the requested permission action',
   /updateRecord\('payment_requests',\s*id,\s*patch,\s*\{\s*skipValidation:\s*true,\s*permissionAction:\s*neededSave\s*\}\)/.test(paymentsRender));
 
@@ -422,6 +444,250 @@ check('Supplier scorecards build Data Quality context once before supplier loop'
   scorecardDqCtxPos !== -1 && scorecardMapPos !== -1 && scorecardDqCtxPos < scorecardMapPos);
 check('Supplier scorecards pass Data Quality context into order scoring',
   /dqFn\(o,\s*dqCtx\)/.test(scorecardBuildSource));
+
+// --- Procurement Follow-up engine behavioral checks ---
+const procBaseDate = new Date('2026-07-10T12:00:00');
+const DAY_MS = 86400000;
+function procDateStart(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? new Date(value) : new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+function procIso(days) {
+  const d = new Date(procBaseDate);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function createProcFollowupWindow(dataOverrides = {}) {
+  const state = {
+    data: {
+      orders: [],
+      shipments: [],
+      payments: [],
+      documents: [],
+      followups: [],
+      issues: [],
+      suppliers: [],
+      ...dataOverrides
+    }
+  };
+  const px = {
+    recordEntity: record => record && record.entity || 'Phoenix',
+    orderNeedsShipment: order => order && order.orderType === 'foreign' && !order.noShipment,
+    isErpOrder: order => !!(order && order.erpSource && order.erpSource !== 'Manual'),
+    escapeHtml: value => String(value == null ? '' : value),
+    dataQualityThresholds: {
+      acknowledgementWorkingDays: 3,
+      noFollowupWorkingDays: 5,
+      readyNoShipmentWorkingDays: 2
+    },
+    workingDaysSince: value => {
+      const d = procDateStart(value);
+      const base = procDateStart(procBaseDate);
+      return d ? Math.floor((base - d) / DAY_MS) : null;
+    },
+    workingDaysUntil: value => {
+      const d = procDateStart(value);
+      const base = procDateStart(procBaseDate);
+      return d ? Math.floor((d - base) / DAY_MS) : null;
+    }
+  };
+  const sandbox = { window: { __state: state, PXUtils: px }, console };
+  sandbox.window.window = sandbox.window;
+  vm.runInNewContext(procFollowupSource, sandbox, { filename: 'procurementFollowup.js' });
+  return sandbox.window;
+}
+function procCtx(overrides = {}) {
+  return {
+    orders: [],
+    shipments: [],
+    payments: [],
+    documents: [],
+    followups: [],
+    issues: [],
+    suppliers: [],
+    now: new Date(procBaseDate),
+    ...overrides
+  };
+}
+function issueKeys(list) {
+  return (list || []).map(item => item.key);
+}
+const procWindow = createProcFollowupWindow();
+const proc = procWindow.PXProcFollowup;
+const procForeignOrder = {
+  id: 'proc-foreign',
+  orderId: 'FPO-PROC',
+  entity: 'Phoenix',
+  orderType: 'foreign',
+  supplier: 'Known Supplier',
+  orderSentToSupplierDate: procIso(-5),
+  orderAcknowledgedDate: procIso(-4),
+  orderReadyDate: procIso(-2),
+  requestedReceiptDate: procIso(20)
+};
+check('PXProcFollowup ageingBucket classifies not-sent orders',
+  proc.ageingBucket({ ...procForeignOrder, orderSentToSupplierDate: '' }, procCtx()).key === 'not_sent');
+check('PXProcFollowup ageingBucket classifies sent/no-ack orders',
+  proc.ageingBucket({ ...procForeignOrder, orderAcknowledgedDate: '', orderReadyDate: '' }, procCtx()).key === 'sent_no_ack');
+check('PXProcFollowup ageingBucket classifies acknowledged/no-ready orders',
+  proc.ageingBucket({ ...procForeignOrder, orderReadyDate: '' }, procCtx()).key === 'ack_no_ready');
+check('PXProcFollowup ageingBucket classifies ready/no-shipment orders',
+  proc.ageingBucket(procForeignOrder, procCtx()).key === 'ready_no_shipment');
+check('PXProcFollowup ageingBucket classifies shipment-in-progress orders',
+  proc.ageingBucket(procForeignOrder, procCtx({ shipments: [{ id: 'ship-proc', orderId: 'FPO-PROC', status: 'In transit' }] })).key === 'shipment_in_progress');
+check('PXProcFollowup ageingBucket classifies under-clearance shipments',
+  proc.ageingBucket(procForeignOrder, procCtx({ shipments: [{ id: 'ship-proc-clearance', orderId: 'FPO-PROC', status: 'Under Clearance' }] })).key === 'under_clearance');
+check('PXProcFollowup ageingBucket classifies awaiting-receipt orders',
+  proc.ageingBucket(procForeignOrder, procCtx({ shipments: [{ id: 'ship-proc-done', orderId: 'FPO-PROC', stage: 'completed' }] })).key === 'awaiting_receipt');
+check('PXProcFollowup ageingBucket classifies overdue payment exposure',
+  proc.ageingBucket({
+    id: 'proc-local-pay',
+    orderId: 'LPO-PROC-PAY',
+    entity: 'Phoenix',
+    orderType: 'local',
+    orderSentToSupplierDate: procIso(-2),
+    orderAcknowledgedDate: procIso(-1)
+  }, procCtx({ payments: [{ id: 'pay-proc-overdue', orderId: 'LPO-PROC-PAY', status: 'approved', dueDate: procIso(-1) }] })).key === 'payment_overdue');
+check('PXProcFollowup ageingBucket classifies pending payment/milestone exposure',
+  proc.ageingBucket({
+    id: 'proc-local-pending',
+    orderId: 'LPO-PROC-PENDING',
+    entity: 'Phoenix',
+    orderType: 'local',
+    orderSentToSupplierDate: procIso(-2),
+    orderAcknowledgedDate: procIso(-1),
+    milestones: [{ id: 'milestone-pending', label: 'Balance' }]
+  }, procCtx()).key === 'payment_pending');
+check('PXProcFollowup ageingBucket classifies closed orders',
+  proc.ageingBucket({ ...procForeignOrder, isClosed: true }, procCtx()).key === 'closed');
+
+const commitmentResult = proc.commitment({
+  ...procForeignOrder,
+  supplierPromisedDate: procIso(5),
+  supplierRevisedPromisedDate: procIso(-2),
+  supplierPromiseRevisionCount: 2,
+  supplierDelayReason: 'Factory delay',
+  supplierReplySummary: 'Revised date confirmed'
+}, procCtx());
+check('PXProcFollowup commitment prefers revised promise and marks overdue',
+  commitmentResult.label === 'Revised promise' && commitmentResult.daysUntil === -2 && commitmentResult.overdue && commitmentResult.revisions === 2);
+
+const chaseDueSoon = proc.nextChase({
+  ...procForeignOrder,
+  nextSupplierFollowupDate: procIso(2),
+  lastSupplierFollowupDate: procIso(-3),
+  followupMethod: 'Email',
+  followupFrequencyDays: '7'
+});
+const chaseOverdue = proc.nextChase({ ...procForeignOrder, nextSupplierFollowupDate: procIso(-1) });
+check('PXProcFollowup nextChase marks due-soon follow-ups',
+  chaseDueSoon.dueSoon && !chaseDueSoon.overdue && chaseDueSoon.method === 'Email' && chaseDueSoon.frequencyDays === 7);
+check('PXProcFollowup nextChase marks overdue follow-ups',
+  chaseOverdue.overdue && !chaseOverdue.dueSoon && chaseOverdue.daysUntil === -1);
+
+const exposure = proc.paymentExposure({
+  id: 'proc-pay-order',
+  orderId: 'LPO-PROC-EXPOSURE',
+  milestones: [
+    { id: 'milestone-open' },
+    { id: 'milestone-rfp', rfpRef: 'RFP-1' },
+    { id: 'milestone-paid', paidDate: procIso(-1) }
+  ]
+}, procCtx({
+  payments: [
+    { id: 'pay-overdue', orderId: 'LPO-PROC-EXPOSURE', status: 'approved', dueDate: procIso(-1) },
+    { id: 'pay-future', orderId: 'LPO-PROC-EXPOSURE', status: 'draft', dueDate: procIso(5) },
+    { id: 'pay-paid', orderId: 'LPO-PROC-EXPOSURE', status: 'paid', dueDate: procIso(-3) },
+    { id: 'pay-other', orderId: 'OTHER', status: 'approved', dueDate: procIso(-1) }
+  ]
+}));
+check('PXProcFollowup paymentExposure separates pending, overdue, and milestone exposure',
+  exposure.pendingPayments.length === 2 && exposure.overduePayments.length === 1 && exposure.pendingMilestones.length === 1);
+
+const lowRisk = proc.riskScore({ id: 'risk-low', orderId: 'RISK-LOW', entity: 'Phoenix', orderType: 'local', isClosed: true }, procCtx());
+const mediumRisk = proc.riskScore({
+  id: 'risk-medium',
+  orderId: 'RISK-MEDIUM',
+  entity: 'Phoenix',
+  orderType: 'local',
+  orderSentToSupplierDate: procIso(-2),
+  orderAcknowledgedDate: procIso(-2),
+  requestedReceiptDate: procIso(-1)
+}, procCtx());
+const highRisk = proc.riskScore({
+  id: 'risk-high',
+  orderId: 'RISK-HIGH',
+  entity: 'Phoenix',
+  orderType: 'local',
+  orderSentToSupplierDate: procIso(-2),
+  orderAcknowledgedDate: procIso(-2),
+  requestedReceiptDate: procIso(-5),
+  supplierPromisedDate: procIso(-2),
+  nextSupplierFollowupDate: procIso(-1),
+  amount: 500000
+}, procCtx());
+const criticalRisk = proc.riskScore({
+  id: 'risk-critical',
+  orderId: 'RISK-CRITICAL',
+  entity: 'Phoenix',
+  orderType: 'local',
+  orderSentToSupplierDate: procIso(-20),
+  requestedReceiptDate: procIso(-10),
+  orderCriticality: 'critical',
+  amount: 1000000,
+  milestones: [{ id: 'milestone-critical' }],
+  erpSource: 'Business Central',
+  erpSyncStatus: 'error',
+  erpPoStatus: 'Closed',
+  erpVendorNo: 'V-1',
+  supplierMatchMethod: 'unmatched',
+  supplier: 'Phoenix Supplier',
+  erpVendorName: 'Different Supplier',
+  erpAmount: 10,
+  currency: 'EUR',
+  erpCurrency: 'USD'
+}, procCtx({
+  payments: [{ id: 'pay-critical', orderId: 'RISK-CRITICAL', status: 'approved', dueDate: procIso(-5) }],
+  issues: [{ id: 'issue-critical', relatedType: 'order', relatedId: 'risk-critical', status: 'open', severity: 'critical', targetResolutionDate: procIso(-1), issueType: 'Quality' }]
+}));
+check('PXProcFollowup riskScore covers low band',
+  lowRisk.level === 'low' && lowRisk.score === 0);
+check('PXProcFollowup riskScore covers medium band',
+  mediumRisk.level === 'medium' && mediumRisk.score >= 25 && mediumRisk.score < 50);
+check('PXProcFollowup riskScore covers high band',
+  highRisk.level === 'high' && highRisk.score >= 50 && highRisk.score < 75);
+check('PXProcFollowup riskScore covers critical band and clamps at 100',
+  criticalRisk.level === 'critical' && criticalRisk.score === 100);
+check('PXProcFollowup riskScore is monotonic across crafted risk cases',
+  lowRisk.score < mediumRisk.score && mediumRisk.score < highRisk.score && highRisk.score < criticalRisk.score);
+
+const erpKeys = issueKeys(proc.erpExceptions({
+  id: 'erp-exception',
+  orderId: 'ERP-EXCEPTION',
+  entity: 'Phoenix',
+  erpSource: 'Business Central',
+  erpSyncStatus: 'error',
+  erpPoStatus: 'Closed',
+  isClosed: false,
+  erpVendorNo: 'V-1',
+  supplierMatchMethod: 'unmatched',
+  supplier: 'Phoenix Supplier',
+  erpVendorName: 'Different Supplier',
+  amount: 1000,
+  erpAmount: 900,
+  currency: 'EUR',
+  erpCurrency: 'USD'
+}, procCtx()));
+check('PXProcFollowup erpExceptions detects ERP mismatch keys',
+  ['sync-missing', 'sync-error', 'erp-closed-phoenix-open', 'supplier-unmapped', 'supplier-mismatch', 'amount-mismatch', 'currency-mismatch']
+    .every(key => erpKeys.includes(key)));
+check('PXProcFollowup erpExceptions detects stale ERP sync',
+  issueKeys(proc.erpExceptions({ id: 'erp-stale', orderId: 'ERP-STALE', entity: 'Phoenix', erpSource: 'Business Central', erpLastSyncedAt: procIso(-5) }, procCtx())).includes('sync-stale'));
+check('PXProcFollowup erpExceptions detects manual records with integration metadata',
+  issueKeys(proc.erpExceptions({ id: 'manual-integration', orderId: 'MANUAL-INTEGRATION', erpSource: 'Manual', integrationLayer: 'warehouse-sync' }, procCtx())).includes('manual-with-integration'));
 
 // --- My Work computed action checks ---
 const myWorkSource = read('src/myWork.js');
