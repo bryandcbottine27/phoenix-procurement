@@ -229,6 +229,252 @@ check('PXPermissions denies stakeholder payment creation',
 check('PXPermissions allows stakeholder update request creation',
   permSandbox.window.PXPermissions.can('updateRequests:create') === true);
 
+// --- ERP import rule classification checks ---
+const importRulesSource = read('src/importRules.js');
+const importRuleWindow = {
+  __state: { data: { importRules: [] } },
+  PXStore: {}
+};
+vm.runInNewContext(importRulesSource, { window: importRuleWindow, console }, { filename: 'importRules.js' });
+const importRules = importRuleWindow.PXImportRules;
+check('BC purchaser code ET01 classifies as indirect',
+  importRules.resolveFunction({
+    entity: 'Edena',
+    erpSource: 'Business Central',
+    values: { 'Purchaser Code': 'ET01', 'Created By': '' }
+  }) === 'indirect');
+check('BC Created By fallback classifies blank purchaser code',
+  importRules.resolveFunction({
+    entity: 'Seychelles Breweries',
+    erpSource: 'Business Central',
+    values: { 'Purchaser Code': '', 'Created By': 'SUPPLYCHAIN' }
+  }) === 'supplychain');
+check('Edena blank BC currency resolves to EUR',
+  importRules.resolveLocalCurrency({
+    entity: 'Edena',
+    erpSource: 'Business Central',
+    values: { 'Currency Code': '' }
+  }) === 'EUR');
+importRuleWindow.__state.data.importRules = [{
+  ruleKey: 'bc-purchaser-et01',
+  ruleType: 'function',
+  entity: '*',
+  erpSource: 'Business Central',
+  sourceField: 'Purchaser Code',
+  matchValue: 'ET01',
+  resultValue: 'technical',
+  priority: 10,
+  active: true
+}];
+check('stored import rule overrides matching baseline rule',
+  importRules.resolveFunction({
+    entity: 'Edena',
+    erpSource: 'Business Central',
+    values: { 'Purchaser Code': 'ET01', 'Created By': '' }
+  }) === 'technical');
+
+// --- Data Quality checks ---
+const dataQualitySource = read('src/dataQuality.js');
+const dataQualityWindow = {
+  __state: {
+    data: {
+      businessCalendars: [
+        { entity: 'Phoenix', holidays: ['2026-07-06'] }
+      ]
+    }
+  },
+  PXDocuments: null,
+  PXUtils: {
+    currentEntity: () => 'Phoenix',
+    orderNeedsShipment: order => order.orderType === 'foreign' && !order.noShipment
+  }
+};
+vm.runInNewContext(dataQualitySource, { window: dataQualityWindow, console }, { filename: 'dataQuality.js' });
+const dq = dataQualityWindow.PXUtils;
+check('working-day helper excludes weekends and configured holidays',
+  dq.workingDaysBetween('2026-07-03', '2026-07-07', 'Phoenix') === 1);
+
+function isoOffset(days) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function hasIssue(list, key) {
+  return Array.isArray(list) && list.some(item => item.key === key);
+}
+const dqContext = {
+  shipments: [],
+  payments: [],
+  followups: [],
+  issues: [],
+  documents: [],
+  entity: 'Phoenix',
+  orderNeedsShipment: order => order.orderType === 'foreign' && !order.noShipment
+};
+let dqIssues = dq.orderDataQuality({
+  id: 'order-ready-today',
+  orderId: 'FPO-READY-TODAY',
+  entity: 'Phoenix',
+  orderType: 'foreign',
+  orderReadyDate: isoOffset(0),
+  requestedReceiptDate: isoOffset(45),
+  supplier: 'Known Supplier',
+  officerCode: 'ME',
+  orderAcknowledgedDate: isoOffset(-1)
+}, dqContext);
+check('Data Quality does not fire ready/no-shipment on day zero',
+  !hasIssue(dqIssues, 'order-ready-no-shipment'));
+
+dqIssues = dq.orderDataQuality({
+  id: 'order-ready-old',
+  orderId: 'FPO-READY-OLD',
+  entity: 'Phoenix',
+  orderType: 'foreign',
+  orderReadyDate: isoOffset(-7),
+  requestedReceiptDate: isoOffset(45),
+  supplier: 'Known Supplier',
+  officerCode: 'ME',
+  orderAcknowledgedDate: isoOffset(-8)
+}, dqContext);
+check('Data Quality fires ready/no-shipment after shared grace period',
+  hasIssue(dqIssues, 'order-ready-no-shipment'));
+
+// --- My Work computed action checks ---
+const myWorkSource = read('src/myWork.js');
+function createMyWorkSandbox(dataOverrides = {}) {
+  const state = {
+    officer: { code: 'ME', fullName: 'Morgan Example', role: 'procurement_technical_officer' },
+    filters: {},
+    data: {
+      orders: [],
+      shipments: [],
+      payments: [],
+      exports: [],
+      followups: [],
+      issues: [],
+      documents: [],
+      suppliers: [],
+      officers: [],
+      ...dataOverrides
+    }
+  };
+  const px = {
+    $: () => null,
+    $$: () => [],
+    fmtDate: value => String(value || ''),
+    fmtMoney: (amount, currency) => `${currency || ''} ${amount || ''}`.trim(),
+    daysBetween: () => 0,
+    escapeHtml: value => String(value == null ? '' : value),
+    statusBadgeClass: () => 'neutral',
+    generateMilestonesFromTerm: () => [],
+    computeMilestoneDate: milestone => milestone.expectedDate || milestone.expectedDateOverride || null,
+    milestoneStatus: () => 'planned',
+    orderFunction: order => order.function || '',
+    orderNeedsShipment: order => order.orderType === 'foreign' && !order.noShipment,
+    currentEntity: () => 'Phoenix',
+    recordEntity: record => record.entity || 'Phoenix',
+    entityMeta: code => ({ code, short: code === 'Phoenix' ? 'PHX' : code, accent: '#002955' }),
+    currentRole: () => 'procurement_technical_officer',
+    canEditOrders: () => true,
+    canEditShipments: () => false,
+    canManageShipments: () => false,
+    shipmentFollowupActionOpen: () => false,
+    dataQualityThresholds: { acknowledgementWorkingDays: 3, readyNoShipmentWorkingDays: 2 },
+    workingDaysSince: value => {
+      if (!value) return null;
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return null;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      d.setHours(0, 0, 0, 0);
+      return Math.floor((today - d) / 86400000);
+    },
+    can: (resource, action) => resource === 'payments' && ['create', 'edit'].includes(action)
+  };
+  const sandbox = {
+    window: {
+      __state: state,
+      __renderers: {},
+      PXUtils: px,
+      REF: {
+        actionThresholds: {
+          dueSoonDays: 7,
+          upcomingDays: 30,
+          requestedNotAssignedDays: 2,
+          arrivedNoGrnGraceDays: 2,
+          readyNoShipmentDays: 2,
+          noAckDays: 3
+        },
+        entities: [{ code: 'Phoenix', short: 'PHX', accent: '#002955' }],
+        shipmentStages: {}
+      }
+    },
+    console
+  };
+  sandbox.window.window = sandbox.window;
+  vm.runInNewContext(myWorkSource, sandbox, { filename: 'myWork.js' });
+  return sandbox.window;
+}
+
+let myWorkWindow = createMyWorkSandbox({
+  orders: [{
+    id: 'order-mywork-ready',
+    orderId: 'FPO-MW-READY',
+    entity: 'Phoenix',
+    orderType: 'foreign',
+    officerCode: 'ME',
+    isClosed: false,
+    orderSentToSupplierDate: isoOffset(-9),
+    orderAcknowledgedDate: isoOffset(-8),
+    orderReadyDate: isoOffset(-7),
+    requestedReceiptDate: isoOffset(45)
+  }]
+});
+let myWork = myWorkWindow.__myWorkCompute({ renderDom: false, entityOverride: 'Phoenix' });
+check('My Work surfaces ready/no-shipment action after grace period', myWork && myWork.actionCount === 1);
+
+myWorkWindow = createMyWorkSandbox({
+  orders: [{
+    id: 'order-mywork-ready',
+    orderId: 'FPO-MW-READY',
+    entity: 'Phoenix',
+    orderType: 'foreign',
+    officerCode: 'ME',
+    isClosed: false,
+    orderSentToSupplierDate: isoOffset(-9),
+    orderAcknowledgedDate: isoOffset(-8),
+    orderReadyDate: isoOffset(-7),
+    requestedReceiptDate: isoOffset(45)
+  }],
+  shipments: [{ id: 'ship-mywork-ready', shipmentId: 'FPO-MW-READY (S1)', orderId: 'FPO-MW-READY', entity: 'Phoenix' }]
+});
+myWork = myWorkWindow.__myWorkCompute({ renderDom: false, entityOverride: 'Phoenix' });
+check('My Work ready/no-shipment action disappears after shipment exists', myWork && myWork.actionCount === 0);
+
+myWorkWindow = createMyWorkSandbox({
+  followups: [{
+    id: 'followup-open',
+    status: 'open',
+    assignedTo: 'ME',
+    nextAction: 'Call supplier',
+    nextActionDueDate: isoOffset(-1)
+  }]
+});
+myWork = myWorkWindow.__myWorkCompute({ renderDom: false, entityOverride: 'Phoenix' });
+check('My Work surfaces open assigned follow-up', myWork && myWork.actionCount === 1);
+
+myWorkWindow = createMyWorkSandbox({
+  followups: [{
+    id: 'followup-done',
+    status: 'done',
+    assignedTo: 'ME',
+    nextAction: 'Call supplier',
+    nextActionDueDate: isoOffset(-1)
+  }]
+});
+myWork = myWorkWindow.__myWorkCompute({ renderDom: false, entityOverride: 'Phoenix' });
+check('My Work hides processed follow-up', myWork && myWork.actionCount === 0);
+
 console.log();
 if (failures.length) {
   console.error(`REGRESSION CHECK FAILED (${failures.length} issue(s)):`);

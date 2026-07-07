@@ -1531,8 +1531,9 @@ into an automated gate.
 **Local regression checks.** `tools/regression_checks.js` also runs at the end of `build.py` when Node
 is available. Use it for executable source-level regressions that do not need a browser or Firebase
 emulator: role permission expectations, production fail-closed behavior, Firestore rules drift,
-payment approval routing, and validator guardrails. Keep broad structural string checks in
-`check_invariants.py`; keep behaviour-style source checks in `regression_checks.js`.
+payment approval routing, validator guardrails, ERP import classification, Data Quality timing, and
+My Work computed actions. Keep broad structural string checks in `check_invariants.py`; keep
+behaviour-style source checks in `regression_checks.js`.
 
 **Optimistic concurrency (stale-write protection).** `PXStore.updateRecord` accepts an optional
 `opts.expectedUpdatedAt`. If provided and the live record's `updatedAt` is newer (someone saved first),

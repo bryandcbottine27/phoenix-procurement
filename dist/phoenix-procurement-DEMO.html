@@ -10169,6 +10169,7 @@ function myWorkCompute(opts) {
 
 // Exposed so the sidebar badge (updateCounts) can compute the SAME count the page
 // shows, but scoped to the active sidebar entity (per-entity badge).
+window.__myWorkCompute = myWorkCompute;
 window.__myWorkCount = function() {
   const ent = window.PXUtils && window.PXUtils.currentEntity ? window.PXUtils.currentEntity() : '';
   const r = myWorkCompute({ renderDom: false, entityOverride: ent });

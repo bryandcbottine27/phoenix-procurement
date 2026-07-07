@@ -126,7 +126,7 @@ This currently performs:
 - JavaScript syntax check for all modules
 - generated demo build
 - structural invariant checks, including the pre-test data integrity guards and package zip hygiene
-- local Node regression checks for role permissions, production fail-closed access, Firestore rule drift, payment approval routing, and validator guardrails
+- local Node regression checks for role permissions, production fail-closed access, Firestore rule drift, payment approval routing, validator guardrails, ERP import classification, Data Quality timing, and My Work computed actions
 
 There is currently no `package.json`, lint runner, TypeScript checker, migration runner, Firebase emulator, or Firebase rules validation command in the repo. The local regression harness is `tools/regression_checks.js` and is run by `build.py`.
 

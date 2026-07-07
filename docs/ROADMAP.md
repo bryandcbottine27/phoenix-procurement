@@ -104,11 +104,11 @@ Scope:
 - Add a minimal JavaScript test harness or Playwright smoke suite.
 - Cover role permissions for create/edit/payment/update-request actions. Initial local coverage is in `tools/regression_checks.js`.
 - Cover production fail-closed role behaviour, Firestore rule drift assumptions, payment approval routing, and validator guardrails. Initial local coverage is in `tools/regression_checks.js`.
-- Cover import classification.
+- Cover import classification. Initial local coverage is in `tools/regression_checks.js`.
 - Cover order/shipment status lists.
 - Cover GRN receipt model.
-- Cover Data Quality warning calculations.
-- Cover My Work computed action completion/snooze.
+- Cover Data Quality warning calculations. Initial local ready/no-shipment and working-day coverage is in `tools/regression_checks.js`.
+- Cover My Work computed action completion/snooze. Initial local ready/no-shipment and processed-follow-up disappearance coverage is in `tools/regression_checks.js`; snooze and rendered browser behaviour still need e2e coverage.
 - Cover build invariants.
 
 Acceptance criteria:
@@ -123,7 +123,7 @@ Validation:
 & 'C:\Users\Administrator\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .\build.py
 ```
 
-Remaining gap: browser/e2e coverage is still needed for rendered UI flows, role walkthroughs, and My Work disappearing-after-processed behaviour.
+Remaining gap: browser/e2e coverage is still needed for rendered UI flows, role walkthroughs, snooze behaviour, and cross-view smoke testing.
 
 ## Milestone 3 - SharePoint document adapter
 
