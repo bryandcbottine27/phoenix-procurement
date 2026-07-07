@@ -130,3 +130,14 @@ if os.path.exists(check_script):
     subprocess.run([sys.executable, check_script], check=True)
 else:
     print("WARN: tools/check_invariants.py missing — skipping invariant checks.")
+
+# No-dependency local regression checks for permission, security-rule, and data
+# integrity contracts that can be tested before a final Firebase environment exists.
+regression_script = os.path.join(HERE, 'tools', 'regression_checks.js')
+if os.path.exists(regression_script):
+    if _node_available():
+        subprocess.run(['node', regression_script], check=True)
+    else:
+        print("WARN: node not found — skipping regression checks.")
+else:
+    print("WARN: tools/regression_checks.js missing — skipping regression checks.")

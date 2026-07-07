@@ -88,7 +88,7 @@ Manual browser validation is required until automated e2e tests exist.
 
 ## Milestone 2 - Automated regression checks
 
-Status: planned.
+Status: initial local harness completed; broader browser/e2e coverage remains planned.
 
 Goal:
 
@@ -102,8 +102,9 @@ Dependencies:
 Scope:
 
 - Add a minimal JavaScript test harness or Playwright smoke suite.
+- Cover role permissions for create/edit/payment/update-request actions. Initial local coverage is in `tools/regression_checks.js`.
+- Cover production fail-closed role behaviour, Firestore rule drift assumptions, payment approval routing, and validator guardrails. Initial local coverage is in `tools/regression_checks.js`.
 - Cover import classification.
-- Cover role permissions for create/edit/payment/update-request actions.
 - Cover order/shipment status lists.
 - Cover GRN receipt model.
 - Cover Data Quality warning calculations.
@@ -112,17 +113,17 @@ Scope:
 
 Acceptance criteria:
 
-- A single command runs automated regression tests.
+- A single command runs automated regression tests. Initial command is the normal `build.py` validation.
 - CI or local pre-ship checklist includes tests.
 - Permission-sensitive actions have explicit tests.
 
 Validation:
 
-To be defined after test framework selection. Until then:
-
 ```powershell
 & 'C:\Users\Administrator\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' .\build.py
 ```
+
+Remaining gap: browser/e2e coverage is still needed for rendered UI flows, role walkthroughs, and My Work disappearing-after-processed behaviour.
 
 ## Milestone 3 - SharePoint document adapter
 
@@ -226,6 +227,7 @@ Scope:
 - Set `APP_CONFIG.demoMode = false`.
 - Set `APP_CONFIG.authMode = 'password'` or corporate SSO equivalent.
 - Deploy and test Firestore rules.
+- Use the role-aligned authenticated template in `docs/FIRESTORE_RULES/firestore.rules.authenticated`.
 - Restrict API key.
 - Remove or disable demo purge in production.
 - Test every role from the access grid.
@@ -237,6 +239,7 @@ Acceptance criteria:
 - Unknown role fails closed.
 - Firestore rules block unauthorized writes even if the browser UI is bypassed.
 - View-only roles cannot create payment requests or edit restricted records.
+- A production officer profile with no role or an unknown role receives no write access and no direct-view navigation access.
 
 Validation:
 

@@ -38,6 +38,7 @@ Core application foundation:
 - Generated `docs/DATA_DICTIONARY.md`, currently 358 fields across schema.
 - Build-time invariant checks in `tools/check_invariants.py`, including structure, status-map, pre-test data-integrity, and package-zip hygiene checks.
 - JavaScript syntax gate through Node `--check` in `build.py`.
+- Local regression checks in `tools/regression_checks.js`, run by `build.py`, covering critical role permissions, production fail-closed access, Firestore rule drift, payment approval routing, and validator guardrails.
 
 Data and write control:
 
@@ -83,6 +84,7 @@ Finance and payment control:
 - Percentage-generated milestone amounts reconcile to the order total by assigning rounding remainder to the final milestone when percentages total 100%.
 - Payment detail and printable RFP.
 - Payment request write permissions enforced through `PXStore` and UI permission checks.
+- Payment approval-only updates now pass `payments:approve` through `PXStore`, so approve-only roles are not blocked by the generic edit permission check.
 - View-only users can view payments but should not be able to create payment requests.
 
 Operational follow-up:
@@ -137,13 +139,13 @@ Authentication and access:
 - Production build is intended to use individual username/password through Firebase Auth.
 - Officer profile lookup supports Auth UID document id, `authUid`, and `email`.
 - Demo role switching is ignored in production mode.
-- Production permission posture fails closed for unknown roles/resources.
+- Production permission posture fails closed for unknown roles/resources and for production officer profiles with no assigned role.
 
 ## Partially completed work
 
 - SharePoint integration is metadata-ready only. Folder path rules exist, but Microsoft Graph upload, folder creation, delete/rename policy, and permission inheritance are not implemented.
 - Data Warehouse integration is a contract and adapter only. `PXWarehouse` defines the target shape and returns "not connected"; the current operational feed is Excel import.
-- Firestore security rule templates exist under `docs/FIRESTORE_RULES`, but they have not been deployed or validated against a production Firebase project in this repository.
+- Firestore security rule templates exist under `docs/FIRESTORE_RULES`. The authenticated template has been tightened to mirror the main app permission matrix and local regression checks guard the highest-risk assumptions, but the rules have not been deployed or validated against a production Firebase project in this repository.
 - Production package generation exists as a process and zip output, but production hosting, Firebase project separation, API-key restriction, and authentication deployment remain IT tasks.
 - Visual smoke testing is limited by local Firebase/auth/network behaviour in the desktop browser environment. Build validation passes, but browser role/entity walkthroughs should still be repeated before demo.
 - Access grid documentation exists, but the role matrix is broad and should be re-tested after every access-sensitive change.
@@ -161,7 +163,7 @@ Authentication and access:
 
 ## Current known bugs and limitations
 
-- No `package.json`, npm test, lint, or TypeScript configuration exists. Current validation is Python build, generated data dictionary check, Node syntax checks, and invariant checks for structure, status maps, pre-test data-integrity guards, and package zip hygiene.
+- No `package.json`, npm test, lint, or TypeScript configuration exists. Current validation is Python build, generated data dictionary check, Node syntax checks, invariant checks for structure/status maps/pre-test data-integrity/package zip hygiene, and local Node regression checks.
 - Browser/client-side permission checks are not sufficient for production security. Firestore rules and authenticated identity must enforce access server-side before go-live.
 - Demo mode still contains demo aids such as role switching. The guarded demo purge code remains for isolated reset testing, but `REF.demoResetEnabled` is disabled by default and must stay disabled for shared testing, pilot, and production builds.
 - SharePoint upload is not live; documents are metadata/link/demo-upload records only.
@@ -173,9 +175,9 @@ Authentication and access:
 
 1. Browser-test the pre-testing stability fixes: demo purge hidden/blocked, duplicate shipment ID blocked, blank shipment status blocked, receipt result requiring GRN date/link, ready-without-shipment grace period, milestone amount reconciliation, and order Awaiting/Overdue filters after GRN.
 2. Repeat a visual smoke test of dashboard, entity switching, filter pane, order detail, shipment detail, Exports/Outbound, KPI Trends capture/backfill, payment permissions, and production login mode.
-3. Re-test access rules for view-only users, especially payment request creation, exports, KPI capture, update request visibility, and GRN entry through orders versus shipments.
-4. Create automated checks for permission-sensitive actions and My Work disappearing-after-processed logic.
-5. Decide the next delivery tranche: either SharePoint adapter design, Data Warehouse/API design, or operational feature polishing. Do not mix these without a milestone boundary.
+3. Re-test access rules in the browser for view-only users, especially payment request creation, exports, KPI capture, update request visibility, and GRN entry through orders versus shipments.
+4. Extend automated checks to import classification, Data Quality/My Work calculations, and My Work disappearing-after-processed logic.
+5. Validate and deploy the authenticated Firestore rules in the final Firebase project, then decide the next delivery tranche: SharePoint adapter design, Data Warehouse/API design, or operational feature polishing.
 
 ## Current validation baseline
 
@@ -185,6 +187,7 @@ Last local validation during this handover pass:
 - Data dictionary regenerated and checked: passed.
 - Structural invariants: passed.
 - Pre-test data-integrity invariants and approved package-zip hygiene checks: passed.
+- Local role/security/data regression checks: passed.
 - JavaScript syntax check for all 62 modules: passed.
 - Demo build output generated: `dist/phoenix-procurement-DEMO.html`.
 - Isolated staged production build with `demoMode: false` and `authMode: 'password'`: passed.
@@ -195,4 +198,4 @@ Last local validation during this handover pass:
 - The refreshed production package includes source/docs/tools plus only `dist/phoenix-procurement-PRODUCTION.html` under `dist`.
 - No timestamped or `pre-*` package zip files should be kept in the project root.
 
-No separate lint, type check, unit test, migration, or Firebase rules validation command exists in the repository at this time.
+No separate lint, type check, package-managed unit test, migration, Firebase emulator, or Firebase rules validation command exists in the repository at this time.

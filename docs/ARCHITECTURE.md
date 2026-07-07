@@ -16,7 +16,8 @@ Last reviewed: 2026-07-06
 - Firestore is the current database.
 - No npm package, bundler, TypeScript, or framework is used.
 - Python build tooling is used for concatenation, data dictionary generation, and invariant checks.
-- Node is used by `build.py` for JavaScript syntax checking only.
+- Node is used by `build.py` for JavaScript syntax checking and the dependency-free
+  local regression checks in `tools/regression_checks.js`.
 
 ## Source and build architecture
 
@@ -40,6 +41,7 @@ The generated artifact is:
 5. Inlines every module listed in `build.py` in the exact expected order.
 6. Writes `dist/phoenix-procurement-DEMO.html`.
 7. Runs structural, high-risk data-integrity, and package-hygiene invariants in `tools/check_invariants.py`.
+8. Runs local role/security/data regression checks in `tools/regression_checks.js` when Node is available.
 
 The production package is generated from the same source with production settings in `APP_CONFIG`.
 
@@ -192,7 +194,7 @@ Authorization layers:
 
 Important limitation:
 
-- Client-side authorization is not enough for production. Firestore security rules must enforce the same access model server-side. Templates exist in `docs/FIRESTORE_RULES`.
+- Client-side authorization is not enough for production. Firestore security rules must enforce the same access model server-side. Role-aligned templates exist in `docs/FIRESTORE_RULES`, and local regression checks guard the main rule assumptions, but the rules still need Firebase Rules Playground/emulator validation and deployment against the final production project.
 
 ## API structure
 

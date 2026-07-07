@@ -200,7 +200,7 @@ window.__saveRfpFlag = async function (id, flag, checked, dateVal) {
   patch[dateField] = checked ? (dateVal ? new Date(dateVal) : new Date()) : null;
   p[flag] = patch[flag]; p[dateField] = patch[dateField];
   try {
-    await window.PXStore.updateRecord('payment_requests', id, patch, { skipValidation: true });
+    await window.PXStore.updateRecord('payment_requests', id, patch, { skipValidation: true, permissionAction: neededSave });
     if (window.PXUtils && window.PXUtils.toast) window.PXUtils.toast(`${flag === 'paymentApproved' ? 'Approval' : 'Paid status'} ${checked ? 'set' : 'cleared'}`, 'success');
   } catch (e) {
     if (window.PXUtils && window.PXUtils.toast) window.PXUtils.toast('Update failed: ' + (e.message || e), 'danger');

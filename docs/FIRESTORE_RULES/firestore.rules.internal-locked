@@ -36,6 +36,7 @@ service cloud.firestore {
     // the app's own role gating for separation of duties in the interim.
     match /orders/{id}          { allow read, write: if hasSession(); }
     match /shipments/{id}       { allow read, write: if hasSession(); }
+    match /exports/{id}         { allow read, write: if hasSession(); }
     match /payment_requests/{id}{ allow read, write: if hasSession(); }
     match /suppliers/{id}       { allow read, write: if hasSession(); }
     match /documents/{id}       { allow read, write: if hasSession(); }

@@ -222,6 +222,7 @@ Confirmed:
 - Finance/payment visibility can be granted without allowing payment request creation.
 - Internal stakeholders and other view-only users must not be allowed to request/create payment.
 - View-only users may see whether a payment request exists and whether it has been paid, where view access allows.
+- Roles with `payments:approve` may approve a payment request even if they do not have general payment edit/create authority. Approval-only updates must remain limited to approval fields.
 
 Validation rules currently implemented:
 
@@ -300,6 +301,7 @@ Confirmed principles:
 - Admin has full access.
 - Production mode ignores demo role overrides.
 - Unknown roles/resources fail closed in production.
+- Production officer profiles with no assigned role also fail closed; they must not fall back to stakeholder visibility.
 - Stream-scoped procurement roles only see their relevant function stream.
 - View-only users must not be able to write through hidden buttons, stale onclicks, or console calls because `PXStore` enforces write permissions.
 - Firestore rules must enforce the same access model server-side before production.

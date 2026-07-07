@@ -1,162 +1,329 @@
 rules_version = '2';
 
 // ============================================================================
-// Phoenix Procurement — Firestore security rules: AUTHENTICATED path
+// Phoenix Procurement - Firestore security rules: AUTHENTICATED path
 // ----------------------------------------------------------------------------
-// Use this when per-user login (Azure AD / M365 → Firebase Auth) is wired (Runbook
-// §4 Path A). It enforces, SERVER-SIDE, that:
-//   - only signed-in users can read or write,
-//   - a user's role comes from their officers/{uid} record (the trusted source),
-//   - writes to business collections require an appropriate role,
-//   - the audit log is append-only,
-//   - nobody can edit their own role to elevate themselves.
+// Use this when per-user login is live. The browser permission matrix still
+// controls the UI, but these rules are the server-side backstop:
+//   - signed-in users can read operational collections;
+//   - trusted roles come from officers/{uid};
+//   - unknown/missing roles fail closed for writes;
+//   - role write rights mirror REF.permissions for the main collections;
+//   - payment approval can be written by approve-only roles without broad edit;
+//   - archived fields require archive authority;
+//   - status_log is append-only;
+//   - users cannot edit their own role/auth binding.
 //
-// REVIEW BEFORE DEPLOYING. Adapt collection/role mappings to your final model, test
-// in the Firebase Rules Playground, then: firebase deploy --only firestore:rules
-// This template is a STARTING POINT, not a finished policy.
+// REVIEW AND TEST BEFORE DEPLOYING:
+//   firebase deploy --only firestore:rules
 // ============================================================================
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---- helpers -----------------------------------------------------------
+    // ---- identity ----------------------------------------------------------
     function signedIn() {
       return request.auth != null;
     }
-    // The caller's officer record holds their role. officers/{uid} == auth uid.
+
+    function officerPath() {
+      return /databases/$(database)/documents/officers/$(request.auth.uid);
+    }
+
+    function hasOfficer() {
+      return signedIn() && exists(officerPath());
+    }
+
     function myOfficer() {
-      return get(/databases/$(database)/documents/officers/$(request.auth.uid)).data;
+      return get(officerPath()).data;
     }
+
     function myRole() {
-      return signedIn() ? myOfficer().role : 'none';
+      return hasOfficer() && ('role' in myOfficer()) ? myOfficer().role : 'no_access';
     }
-    function isAdmin()       { return myRole() == 'admin'; }
-    function isProcurement() {
-      return myRole() in [
-        'procurement_senior_manager',
-        'sc_manager', 'sc_supervisor', 'sc_officer',
-        'procurement_technical_manager', 'procurement_technical_supervisor', 'procurement_technical_officer',
-        'procurement_indirect_manager', 'procurement_indirect_supervisor', 'procurement_indirect_officer'
-      ] || isAdmin();
+
+    function isAdmin() {
+      return myRole() == 'admin';
     }
-    function isProcurementManager() {
-      return myRole() in [
-        'procurement_senior_manager',
-        'sc_manager',
-        'procurement_technical_manager',
-        'procurement_indirect_manager'
-      ] || isAdmin();
-    }
-    function isProcurementOperator() {
-      return myRole() in [
-        'sc_supervisor', 'sc_officer',
-        'procurement_technical_supervisor', 'procurement_technical_officer',
-        'procurement_indirect_supervisor', 'procurement_indirect_officer'
-      ] || isAdmin();
-    }
-    function isLogistics() {
-      return myRole() in ['logistics_manager', 'logistics_officer'] || isAdmin();
-    }
-    function isFinance() {
-      return myRole() == 'finance' || isAdmin();
-    }
-    function isDemandPlanning() {
-      return myRole() in ['demand_supervisor', 'demand_officer'] || isAdmin();
-    }
-    function isPrivileged() {
+
+    function isKnownRole() {
       return myRole() in [
         'admin',
         'procurement_senior_manager',
-        'sc_manager', 'sc_supervisor',
-        'procurement_technical_manager', 'procurement_technical_supervisor',
-        'procurement_indirect_manager', 'procurement_indirect_supervisor',
-        'logistics_manager',
-        'demand_supervisor'
+        'sc_manager', 'sc_supervisor', 'sc_officer',
+        'procurement_technical_manager', 'procurement_technical_supervisor', 'procurement_technical_officer',
+        'procurement_indirect_manager', 'procurement_indirect_supervisor', 'procurement_indirect_officer',
+        'logistics_manager', 'logistics_officer',
+        'demand_supervisor', 'demand_officer',
+        'finance',
+        'stakeholder'
       ];
     }
-    function canWriteShipments() {
-      return isLogistics()
-             || myRole() in ['sc_manager', 'procurement_technical_manager', 'procurement_indirect_manager']
-             || isAdmin();
-    }
-    function canWritePayments() {
-      return isProcurementOperator() || isAdmin();
+
+    function isStreamManager() {
+      return myRole() in ['sc_manager', 'procurement_technical_manager', 'procurement_indirect_manager'];
     }
 
-    // ---- default: deny everything not explicitly allowed -------------------
+    function isStreamSupervisor() {
+      return myRole() in ['sc_supervisor', 'procurement_technical_supervisor', 'procurement_indirect_supervisor'];
+    }
+
+    function isStreamOfficer() {
+      return myRole() in ['sc_officer', 'procurement_technical_officer', 'procurement_indirect_officer'];
+    }
+
+    function isStreamOperator() {
+      return isStreamSupervisor() || isStreamOfficer();
+    }
+
+    function isSeniorProcurement() {
+      return myRole() == 'procurement_senior_manager';
+    }
+
+    function isLogisticsManager() {
+      return myRole() == 'logistics_manager';
+    }
+
+    function isLogisticsOfficer() {
+      return myRole() == 'logistics_officer';
+    }
+
+    function isLogistics() {
+      return isLogisticsManager() || isLogisticsOfficer();
+    }
+
+    function isPrivileged() {
+      return isAdmin()
+        || isSeniorProcurement()
+        || isStreamManager()
+        || isStreamSupervisor()
+        || isLogisticsManager()
+        || myRole() == 'demand_supervisor';
+    }
+
+    // ---- field-diff helpers ----------------------------------------------
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function changesArchivedFields() {
+      return changedKeys().hasAny(['archived', 'archivedAt', 'archivedBy', 'archiveReason']);
+    }
+
+    function onlyPaymentApprovalChanged() {
+      return changedKeys().hasOnly([
+        'paymentApproved',
+        'paymentApprovedDate',
+        'paymentApprovedBy',
+        'updatedAt',
+        'updatedBy'
+      ]);
+    }
+
+    function selfProfileOnlyChanged() {
+      return changedKeys().hasOnly(['fullName', 'code', 'phone', 'updatedAt', 'updatedBy'])
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.active == resource.data.active
+        && request.resource.data.authUid == resource.data.authUid
+        && request.resource.data.email == resource.data.email;
+    }
+
+    // ---- write-right helpers mirroring REF.permissions ---------------------
+    function canWriteOrders() {
+      return isAdmin() || isStreamManager() || isStreamSupervisor() || isStreamOfficer();
+    }
+
+    function canArchiveOrders() {
+      return isAdmin() || isStreamManager();
+    }
+
+    function canWriteShipments() {
+      return isAdmin() || isLogistics() || isStreamManager();
+    }
+
+    function canArchiveShipments() {
+      return isAdmin() || isLogistics() || isStreamManager();
+    }
+
+    function canWriteExports() {
+      return isAdmin() || isLogistics();
+    }
+
+    function canArchiveExports() {
+      return isAdmin() || isLogistics();
+    }
+
+    function canCreatePayments() {
+      return isAdmin() || isStreamOperator();
+    }
+
+    function canEditPayments() {
+      return isAdmin() || isStreamOperator();
+    }
+
+    function canApprovePayments() {
+      return isAdmin()
+        || isSeniorProcurement()
+        || isStreamManager()
+        || isStreamSupervisor()
+        || isLogisticsManager()
+        || myRole() == 'finance';
+    }
+
+    function canArchivePayments() {
+      return isAdmin();
+    }
+
+    function canWriteSuppliers() {
+      return isAdmin() || isSeniorProcurement() || isStreamManager() || isStreamSupervisor() || isStreamOfficer();
+    }
+
+    function canArchiveSuppliers() {
+      return isAdmin() || isSeniorProcurement() || isStreamManager();
+    }
+
+    function canWriteDocuments() {
+      return isAdmin() || isStreamSupervisor() || isStreamOfficer() || isLogistics();
+    }
+
+    function canArchiveDocuments() {
+      return isAdmin() || isLogisticsManager();
+    }
+
+    function canWriteFollowupsAndIssues() {
+      return isAdmin() || isSeniorProcurement() || isStreamManager() || isStreamSupervisor() || isStreamOfficer() || isLogistics();
+    }
+
+    function canArchiveFollowupsAndIssues() {
+      return isAdmin() || isSeniorProcurement() || isStreamManager() || isLogisticsManager();
+    }
+
+    function canWriteUpdateRequests() {
+      return isKnownRole();
+    }
+
+    function canArchiveUpdateRequests() {
+      return isAdmin() || isSeniorProcurement() || isStreamManager() || isLogisticsManager();
+    }
+
+    function canWriteContactLog() {
+      return canWriteFollowupsAndIssues();
+    }
+
+    function canArchiveContactLog() {
+      return canArchiveFollowupsAndIssues();
+    }
+
+    // ---- default deny ------------------------------------------------------
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // ---- officers: read by any signed-in user; only admin manages others ---
-    // A user may read all officers (needed for assignment dropdowns) but may NOT
-    // change their own role (anti-self-elevation): role edits are admin-only.
+    // ---- officers ---------------------------------------------------------
     match /officers/{uid} {
       allow read: if signedIn();
       allow create, delete: if isAdmin();
-      allow update: if isAdmin()
-                    || (request.auth.uid == uid
-                        && request.resource.data.role == resource.data.role); // can edit self but NOT role
+      allow update: if isAdmin() || (request.auth.uid == uid && selfProfileOnlyChanged());
     }
 
-    // ---- orders: procurement creates/edits; everyone signed-in reads -------
+    // ---- core business collections ---------------------------------------
     match /orders/{id} {
-      allow read:   if signedIn();
-      allow create, update: if isProcurement();
+      allow read: if signedIn();
+      allow create: if canWriteOrders();
+      allow update: if (canWriteOrders() && !changesArchivedFields())
+                    || (canArchiveOrders() && changesArchivedFields());
       allow delete: if isAdmin();
     }
 
-    // ---- shipments: logistics creates/edits; stream managers have oversight writes
     match /shipments/{id} {
-      allow read:   if signedIn();
-      allow create, update: if canWriteShipments();
+      allow read: if signedIn();
+      allow create: if canWriteShipments();
+      allow update: if (canWriteShipments() && !changesArchivedFields())
+                    || (canArchiveShipments() && changesArchivedFields());
       allow delete: if isAdmin();
     }
 
-    // ---- exports: outbound movement is logistics-owned ---------------------
     match /exports/{id} {
-      allow read:   if signedIn();
-      allow create, update: if isLogistics();
+      allow read: if signedIn();
+      allow create: if canWriteExports();
+      allow update: if (canWriteExports() && !changesArchivedFields())
+                    || (canArchiveExports() && changesArchivedFields());
       allow delete: if isAdmin();
     }
 
-    // ---- payment_requests: read for signed-in users; write only for RFP owners
     match /payment_requests/{id} {
-      allow read:   if signedIn();
-      allow create, update: if canWritePayments();
+      allow read: if signedIn();
+      allow create: if canCreatePayments();
+      allow update: if (canEditPayments() && !changesArchivedFields())
+                    || (canApprovePayments() && onlyPaymentApprovalChanged())
+                    || (canArchivePayments() && changesArchivedFields());
       allow delete: if isAdmin();
     }
 
-    // ---- suppliers: procurement maintains ----------------------------------
     match /suppliers/{id} {
-      allow read:   if signedIn();
-      allow create, update: if isProcurement();
+      allow read: if signedIn();
+      allow create: if canWriteSuppliers();
+      allow update: if (canWriteSuppliers() && !changesArchivedFields())
+                    || (canArchiveSuppliers() && changesArchivedFields());
       allow delete: if isAdmin();
     }
 
-    // ---- shared operational collections: any signed-in user may contribute -
-    // (documents, follow-ups, issues, update requests, contact log) — these are
-    // collaborative across procurement + logistics. Tighten per-role if required.
-    match /documents/{id}      { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
-    match /followups/{id}      { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
-    match /issues/{id}         { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
-    match /updateRequests/{id} { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
-    match /contactLog/{id}     { allow read: if signedIn(); allow create, update: if signedIn(); allow delete: if isAdmin(); }
+    // ---- operational support collections ---------------------------------
+    match /documents/{id} {
+      allow read: if signedIn();
+      allow create: if canWriteDocuments();
+      allow update: if (canWriteDocuments() && !changesArchivedFields())
+                    || (canArchiveDocuments() && changesArchivedFields());
+      allow delete: if isAdmin();
+    }
 
-    // ---- kpiSnapshot: privileged users capture/backfill; admin may delete ---
-    match /kpiSnapshot/{id}    { allow read: if signedIn(); allow create, update: if isPrivileged(); allow delete: if isAdmin(); }
+    match /followups/{id} {
+      allow read: if signedIn();
+      allow create: if canWriteFollowupsAndIssues();
+      allow update: if (canWriteFollowupsAndIssues() && !changesArchivedFields())
+                    || (canArchiveFollowupsAndIssues() && changesArchivedFields());
+      allow delete: if isAdmin();
+    }
 
-    // ---- status_log: APPEND-ONLY audit trail -------------------------------
-    // Anyone signed-in may add an entry; nobody may modify or delete one.
+    match /issues/{id} {
+      allow read: if signedIn();
+      allow create: if canWriteFollowupsAndIssues();
+      allow update: if (canWriteFollowupsAndIssues() && !changesArchivedFields())
+                    || (canArchiveFollowupsAndIssues() && changesArchivedFields());
+      allow delete: if isAdmin();
+    }
+
+    match /updateRequests/{id} {
+      allow read: if signedIn();
+      allow create: if canWriteUpdateRequests();
+      allow update: if (canWriteUpdateRequests() && !changesArchivedFields())
+                    || (canArchiveUpdateRequests() && changesArchivedFields());
+      allow delete: if isAdmin();
+    }
+
+    match /contactLog/{id} {
+      allow read: if signedIn();
+      allow create: if canWriteContactLog();
+      allow update: if (canWriteContactLog() && !changesArchivedFields())
+                    || (canArchiveContactLog() && changesArchivedFields());
+      allow delete: if isAdmin();
+    }
+
+    // ---- reporting, audit, and system config ------------------------------
+    match /kpiSnapshot/{id} {
+      allow read: if signedIn();
+      allow create, update: if isPrivileged();
+      allow delete: if isAdmin();
+    }
+
     match /status_log/{id} {
-      allow read:   if signedIn();
+      allow read: if signedIn();
       allow create: if signedIn();
       allow update, delete: if false;
     }
 
-    // ---- system_config: admin only -----------------------------------------
     match /system_config/{id} {
-      allow read:  if signedIn();
+      allow read: if signedIn();
       allow write: if isAdmin();
     }
   }

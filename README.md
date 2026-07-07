@@ -39,8 +39,10 @@ python build.py          # regenerates dist/phoenix-procurement-DEMO.html
                          # AND regenerates + verifies docs/DATA_DICTIONARY.md from src/schema.js
 ```
 Requires **Python 3** (no third-party packages). The build runs
-`tools/gen_data_dictionary.py --write` then `--check`, so a build fails if the data
-dictionary drifts from `src/schema.js`. To regenerate the dictionary alone:
+`tools/gen_data_dictionary.py --write` then `--check`, JavaScript syntax checks,
+structural/data-integrity invariants, and the local Node regression checks in
+`tools/regression_checks.js`, so a build fails if the data dictionary, permissions,
+security-rule assumptions, or validator guardrails drift. To regenerate the dictionary alone:
 `python tools/gen_data_dictionary.py --write`.
 
 **Run the modular source (development)** — ES modules need `http://`, not `file://`:

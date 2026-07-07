@@ -254,6 +254,7 @@ Reason:
 Constraint:
 
 - Future UI changes must check both view access and `PXUtils.can('payments','create')`.
+- Approval-only flows must check `PXUtils.can('payments','approve')` and pass that permission action through `PXStore`, rather than requiring broad payment edit authority.
 
 ### SharePoint is the intended document store
 
@@ -298,4 +299,4 @@ $env:PATH='C:\Users\Administrator\.cache\codex-runtimes\codex-primary-runtime\de
 
 Known limitation:
 
-- There is no dedicated unit/e2e test stack yet.
+- There is no package-managed unit/e2e test stack yet. `build.py` now runs the dependency-free local regression harness in `tools/regression_checks.js` for the high-risk permission/security/data contracts that can be tested without the final Firebase environment.

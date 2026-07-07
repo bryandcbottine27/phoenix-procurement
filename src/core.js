@@ -2946,8 +2946,12 @@ function currentRole() {
       if (demo) return normalizeRole(demo);
     } catch (e) {}
   }
-  let r = window.__state.officer?.role || (isDemoMode() ? 'admin' : 'stakeholder');
-  return normalizeRole(r);
+  const assignedRole = window.__state.officer?.role;
+  if (!assignedRole) {
+    // Demo stays easy to test; production fails closed when a profile has no role.
+    return isDemoMode() ? 'admin' : 'no_access';
+  }
+  return normalizeRole(assignedRole);
 }
 window.__currentRole = currentRole;
 // Map legacy/base role values onto the final 10-role set so existing officer records

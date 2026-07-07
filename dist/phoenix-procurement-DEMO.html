@@ -6084,8 +6084,12 @@ function currentRole() {
       if (demo) return normalizeRole(demo);
     } catch (e) {}
   }
-  let r = window.__state.officer?.role || (isDemoMode() ? 'admin' : 'stakeholder');
-  return normalizeRole(r);
+  const assignedRole = window.__state.officer?.role;
+  if (!assignedRole) {
+    // Demo stays easy to test; production fails closed when a profile has no role.
+    return isDemoMode() ? 'admin' : 'no_access';
+  }
+  return normalizeRole(assignedRole);
 }
 window.__currentRole = currentRole;
 // Map legacy/base role values onto the final 10-role set so existing officer records
@@ -17485,7 +17489,7 @@ window.__saveRfpFlag = async function (id, flag, checked, dateVal) {
   patch[dateField] = checked ? (dateVal ? new Date(dateVal) : new Date()) : null;
   p[flag] = patch[flag]; p[dateField] = patch[dateField];
   try {
-    await window.PXStore.updateRecord('payment_requests', id, patch, { skipValidation: true });
+    await window.PXStore.updateRecord('payment_requests', id, patch, { skipValidation: true, permissionAction: neededSave });
     if (window.PXUtils && window.PXUtils.toast) window.PXUtils.toast(`${flag === 'paymentApproved' ? 'Approval' : 'Paid status'} ${checked ? 'set' : 'cleared'}`, 'success');
   } catch (e) {
     if (window.PXUtils && window.PXUtils.toast) window.PXUtils.toast('Update failed: ' + (e.message || e), 'danger');
