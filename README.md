@@ -152,7 +152,8 @@ Warehouse sync is built. Imported orders are stamped with `integrationLayer`, `w
 
 An isolated Backend v1 scaffold now lives under `backend/` for the planned Azure Functions
 plus SQL Server warehouse connector. It is not loaded by the browser app. Use
-`backend/README.md` for backend setup, migrations, and the local `/api/health` trigger.
+`backend/README.md` for backend setup, migrations, fixture-backed source mapping,
+contract drift tests, and the local `/api/health` trigger.
 
 `src/warehouseAdapter.js` defines the future `PXWarehouse` contract and canonical purchase-order
 field shape. `src/erpAdapter.js` keeps the older `PhoenixERP` API alive for existing screens, but

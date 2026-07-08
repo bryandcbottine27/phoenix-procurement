@@ -143,6 +143,8 @@ Backend v1 scaffold:
   - `import_audit`
 - SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
 - Phoenix-owned operational state is represented separately from ERP/provenance columns so the later sync upsert can preserve it.
+- `backend/src/sources/dwSource.ts` reads fixture purchase orders for Gate 2 and normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape.
+- `backend/test/dwSource.test.ts` guards the backend field list against drift from `src/warehouseAdapter.js`.
 
 Planned backend/integration services:
 

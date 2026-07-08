@@ -68,11 +68,15 @@ Create the database before running migrations if your SQL login cannot create it
 
 ## Next Gates
 
-Gate 2 will add the fixture-backed `dwSource.fetchPurchaseOrders()` and mapping
-to the `PXWarehouse.ORDER_CONTRACT_FIELDS` contract.
+Gate 2 adds the fixture-backed `dwSource.fetchPurchaseOrders()` and mapping to
+the `PXWarehouse.ORDER_CONTRACT_FIELDS` contract. The backend keeps a local copy
+of that field list, guarded by a unit test that reads `src/warehouseAdapter.js`
+and fails on drift.
 
 Gate 3 will implement transactional ownership-safe upsert keyed on
-`(entity, orderId)`, preserving Phoenix-owned operational data.
+`(entity, orderId)`, preserving Phoenix-owned operational data. All Gate 3 SQL
+upsert statements must use parameterized `mssql` requests for external values;
+no fixture, warehouse, or user-provided value may be interpolated into SQL text.
 
 Gate 4 will add integration tests against local SQL and document the real Data
 Warehouse swap point.

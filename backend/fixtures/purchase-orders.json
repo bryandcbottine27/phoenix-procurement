@@ -1,0 +1,102 @@
+{
+  "purchaseOrders": [
+    {
+      "sourceSystem": "Navision",
+      "company": "PHOENIX-NAV",
+      "entity": "Phoenix",
+      "documentNo": "FPO12345",
+      "systemId": "NAV-FPO12345",
+      "vendorNo": "V-PHX-100",
+      "vendorName": "ITHEMBA FOR LIFE",
+      "poType": "foreign",
+      "procurementFunction": "technical",
+      "currencyCode": "USD",
+      "totalAmount": "1200.50",
+      "documentDate": "2026-06-28",
+      "postingDescription": "Cooling system spare parts",
+      "paymentTermsCode": "30D",
+      "procurementCategory": "Engineering",
+      "createdFromIpr": "IPR-9001",
+      "hodApprovedDate": "2026-06-25",
+      "requestedBy": "J. Antoine",
+      "requestedReceipt": "2026-08-15",
+      "poStatus": "Open",
+      "hodId": "GMERLE",
+      "purchasingMgrId": "BTHOMAS",
+      "sourceView": "fixture.dw_purchase_orders",
+      "rowId": "fixture-navision-FPO12345",
+      "loadBatchId": "FIXTURE-GATE2",
+      "sourceExtractedAt": "2026-07-08T10:00:00.000Z",
+      "rowHash": "fixture-hash-phoenix-fpo12345",
+      "lines": [
+        {
+          "lineNo": 10000,
+          "itemNo": "SPARE-001",
+          "description": "Compressor kit",
+          "quantity": 2,
+          "amount": 1200.5
+        }
+      ]
+    },
+    {
+      "sourceSystem": "Business Central",
+      "companyName": "SEYBREW-BC",
+      "entity": "Seychelles Breweries",
+      "poNumber": "PO-SBL-22001",
+      "documentGuid": "BC-SBL-22001",
+      "vendorNumber": "V-SBL-220",
+      "supplier": "GAZ CARBONIQUE LTEE",
+      "purchaseOrderType": "local",
+      "categoryFunction": "supplychain",
+      "currency": "SCR",
+      "amountIncludingVat": 9500,
+      "orderDate": "2026-07-01",
+      "purpose": "CO2 cylinder replenishment",
+      "paymentTerms": "COD",
+      "requestedReceiptDate": "2026-07-12",
+      "status": "Released",
+      "createdBy": "SUPPLYCHAIN",
+      "purchaserCode": "SH01",
+      "shipmentMethodCode": "SEA",
+      "sourceTable": "fixture.bc_purchase_orders",
+      "recordId": "fixture-bc-sbl-22001",
+      "batchId": "FIXTURE-GATE2",
+      "extractedAt": "2026-07-08T10:02:00.000Z",
+      "changeHash": "fixture-hash-sbl-22001",
+      "lines": [
+        {
+          "lineNo": 10000,
+          "itemNo": "CO2",
+          "description": "CO2 cylinder",
+          "quantity": 10,
+          "amount": 9500
+        }
+      ]
+    },
+    {
+      "erpSource": "Business Central",
+      "erpCompany": "EDENA-BC",
+      "entity": "Edena",
+      "orderId": "PO-EDN-33001",
+      "erpDocumentId": "BC-EDN-33001",
+      "erpVendorNo": "V-EDN-330",
+      "erpVendorName": "YS ENGINEERING LTD",
+      "orderType": "foreign",
+      "function": "technical",
+      "currency": "EUR",
+      "amount": 7500.75,
+      "dateOfOrder": "2026-07-02",
+      "description": "Bottling line service kit",
+      "paymentTerms": "45D",
+      "requestedReceiptDate": "2026-08-02",
+      "erpPoStatus": "Open",
+      "erpPurchaserCode": "BB01",
+      "warehouseSource": "fixture.bc_purchase_orders",
+      "warehouseRecordId": "fixture-bc-edn-33001",
+      "warehouseBatchId": "FIXTURE-GATE2",
+      "warehouseExtractedAt": "2026-07-08T10:04:00.000Z",
+      "warehouseHash": "fixture-hash-edn-33001",
+      "lines": []
+    }
+  ]
+}

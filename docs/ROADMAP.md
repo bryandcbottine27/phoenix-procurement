@@ -170,7 +170,7 @@ Validation:
 
 ## Milestone 4 - Data Warehouse/API integration design
 
-Status: Backend v1 Gate 1 scaffold complete and locally runtime-proven against Docker SQL Server; still dependent on IT/data team for real Data Warehouse and production SQL environment.
+Status: Backend v1 Gate 2 complete; Gate 1 was locally runtime-proven against Docker SQL Server, and Gate 2 fixture source/mapping tests are green. Still dependent on IT/data team for real Data Warehouse and production SQL environment.
 
 Goal:
 
@@ -194,7 +194,9 @@ Scope:
 - Preserve Phoenix-owned operational data.
 - Scaffolded `backend/` Azure Functions v4 TypeScript project with SQL Server DDL for local development.
 - Gate 1 backend DDL includes SQL `orders`, `sync_exceptions`, and `import_audit`.
-- Next backend gates: fixture-backed source/mapping, ownership-safe transactional upsert, then SQL integration tests and full backend README.
+- Gate 2 adds fixture-backed `dwSource.fetchPurchaseOrders()`, backend purchase-order normalisation, and a drift-guard test against `src/warehouseAdapter.js`.
+- Next backend gates: ownership-safe transactional upsert, then SQL integration tests and full backend README.
+- Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
 Acceptance criteria:
 
