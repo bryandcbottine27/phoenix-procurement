@@ -1,0 +1,4 @@
+allowBuilds:
+  azure-functions-core-tools: true
+onlyBuiltDependencies:
+  - azure-functions-core-tools

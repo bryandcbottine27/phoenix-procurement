@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Backend build output
+backend/dist/
+backend/coverage/
+
+# Local configuration and secrets
+backend/local.settings.json
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/secrets/
+backend/**/*.key
+backend/**/*.pem
+backend/**/*.pfx
+backend/**/*service-account*.json
+backend/**/*ServiceAccount*.json
+backend/**/*connection*.json
+
+# Tooling noise
+.azure/
+.vscode/.azure/
+*.log
+firebase-debug.log
+firestore-debug.log

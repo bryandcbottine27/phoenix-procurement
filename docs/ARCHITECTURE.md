@@ -115,21 +115,36 @@ Major domain folders:
 
 ## Backend architecture
 
-There is no custom backend server in this repository.
+The browser application remains independent of any custom backend and still uses
+Firebase directly for current operational data. A new isolated backend scaffold
+exists under `backend/` for the planned Data Warehouse connector.
 
-Current backend services:
+Current production services used by the browser:
 
 - Firebase Authentication
 - Cloud Firestore
 
-Current client behaviour:
+Current browser behaviour:
 
 - Subscribes to Firestore collections with `onSnapshot`.
 - Writes through `PXStore`.
 - Generates client-side reports, exports, and Excel/CSV artifacts.
 - Reads Excel imports in the browser as a manual staging feed.
 
-Future backend/integration services:
+Backend v1 scaffold:
+
+- Azure Functions v4, Node/TypeScript, using the `@azure/functions` v4 programming model.
+- Package-managed backend dependencies in `backend/package.json`; the root browser app still has no package-managed frontend build.
+- SQL Server access through `mssql`, configured by `SQL_CONNECTION_STRING` in `backend/local.settings.json` or environment variables.
+- `GET /api/health` HTTP trigger checks SQL connectivity.
+- `backend/db/001_init.sql` creates the first SQL tables for warehouse sync:
+  - `orders`
+  - `sync_exceptions`
+  - `import_audit`
+- SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
+- Phoenix-owned operational state is represented separately from ERP/provenance columns so the later sync upsert can preserve it.
+
+Planned backend/integration services:
 
 - Data Warehouse/staging feed.
 - Controlled sync/API service between Data Warehouse and Firestore.
@@ -198,7 +213,11 @@ Important limitation:
 
 ## API structure
 
-There is no HTTP API in this repository.
+Current backend HTTP API scaffold:
+
+- `GET /api/health` in `backend/src/functions/health.ts`, anonymous, returns SQL connectivity status.
+
+No browser screen currently calls this backend API.
 
 Internal JavaScript APIs are exposed as `window.PX*` services and `window.__*` bridges. Important examples:
 
@@ -224,6 +243,11 @@ Internal:
 - `tools/gen_data_dictionary.py`.
 - `tools/check_invariants.py`.
 - `docs/FIRESTORE_RULES` templates.
+- Backend-only package dependencies under `backend/`:
+  - `@azure/functions`
+  - `mssql`
+  - `typescript`
+  - package-managed Azure Functions Core Tools for local function hosting where install scripts are approved.
 
 No third-party frontend package manager dependencies are currently declared.
 
@@ -240,6 +264,7 @@ Future integration:
 - Browser must not directly access ERP or Data Warehouse.
 - Sync may refresh ERP-owned and ERP-seeded fields only.
 - Sync must not overwrite Phoenix-owned operational fields.
+- Backend v1 starts the controlled sync/API side in `backend/` with SQL Server as the local development store and test target.
 
 Document integration:
 

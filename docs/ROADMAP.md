@@ -170,7 +170,7 @@ Validation:
 
 ## Milestone 4 - Data Warehouse/API integration design
 
-Status: planned, dependent on IT/data team.
+Status: Backend v1 Gate 1 scaffold complete and locally runtime-proven against Docker SQL Server; still dependent on IT/data team for real Data Warehouse and production SQL environment.
 
 Goal:
 
@@ -192,6 +192,9 @@ Scope:
 - Define batch audit history.
 - Decide whether sync writes directly to Firestore or through an API service.
 - Preserve Phoenix-owned operational data.
+- Scaffolded `backend/` Azure Functions v4 TypeScript project with SQL Server DDL for local development.
+- Gate 1 backend DDL includes SQL `orders`, `sync_exceptions`, and `import_audit`.
+- Next backend gates: fixture-backed source/mapping, ownership-safe transactional upsert, then SQL integration tests and full backend README.
 
 Acceptance criteria:
 
@@ -206,6 +209,7 @@ Validation:
 - Build passes.
 - Import/sync test with representative Phoenix, Seychelles, and Edena rows.
 - Reconciliation report reviewed by business owner.
+- Backend gate validation additionally requires a SQL Server LocalDB or Docker SQL Server instance plus Azure Functions Core Tools. If SQL is not available, backend integration tests are code-reviewed but not runtime-proven.
 
 ## Milestone 5 - Production authentication and security
 

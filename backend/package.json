@@ -1,0 +1,27 @@
+{
+  "name": "phoenix-procurement-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Azure Functions backend scaffold for Phoenix Procurement warehouse sync.",
+  "main": "dist/src/functions/*.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "start": "pnpm run build && func start",
+    "db:migrate": "pnpm run build && node dist/src/scripts/migrate.js",
+    "test": "pnpm run build"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "mssql": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.7",
+    "@types/node": "^24.0.0",
+    "azure-functions-core-tools": "^4.0.0",
+    "typescript": "^5.8.0"
+  }
+}

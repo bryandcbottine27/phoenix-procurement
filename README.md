@@ -150,6 +150,10 @@ The current Excel import is treated as a controlled **manual staging feed** unti
 Warehouse sync is built. Imported orders are stamped with `integrationLayer`, `warehouseSource`,
 `warehouseBatchId`, `warehouseLoadedAt`, and the usual `erp*` provenance fields.
 
+An isolated Backend v1 scaffold now lives under `backend/` for the planned Azure Functions
+plus SQL Server warehouse connector. It is not loaded by the browser app. Use
+`backend/README.md` for backend setup, migrations, and the local `/api/health` trigger.
+
 `src/warehouseAdapter.js` defines the future `PXWarehouse` contract and canonical purchase-order
 field shape. `src/erpAdapter.js` keeps the older `PhoenixERP` API alive for existing screens, but
 its implementation now points to the warehouse path.

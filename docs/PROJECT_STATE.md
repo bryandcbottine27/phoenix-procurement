@@ -144,7 +144,7 @@ Authentication and access:
 ## Partially completed work
 
 - SharePoint integration is metadata-ready only. Folder path rules exist, but Microsoft Graph upload, folder creation, delete/rename policy, and permission inheritance are not implemented.
-- Data Warehouse integration is a contract and adapter only. `PXWarehouse` defines the target shape and returns "not connected"; the current operational feed is Excel import.
+- Data Warehouse integration is partly scaffolded only. `PXWarehouse` defines the browser-side target shape and still returns "not connected"; the current operational feed remains Excel import. A new isolated `backend/` scaffold exists for Backend v1 using Azure Functions v4, TypeScript, `mssql`, and SQL Server DDL, but it is not yet connected to a real warehouse feed or the browser.
 - Firestore security rule templates exist under `docs/FIRESTORE_RULES`. The authenticated template has been tightened to mirror the main app permission matrix and local regression checks guard the highest-risk assumptions, but the rules have not been deployed or validated against a production Firebase project in this repository.
 - Production package generation exists as a process and zip output, but production hosting, Firebase project separation, API-key restriction, and authentication deployment remain IT tasks.
 - Visual smoke testing is limited by local Firebase/auth/network behaviour in the desktop browser environment. The built demo was opened through localhost and the initial login shell rendered with 62 inlined modules and no console warnings/errors; authenticated dashboard/role/entity walkthroughs should still be repeated before demo using an approved seeded profile or tester login.
@@ -163,7 +163,8 @@ Authentication and access:
 
 ## Current known bugs and limitations
 
-- No `package.json`, npm test, lint, or TypeScript configuration exists. Current validation is Python build, generated data dictionary check, Node syntax checks, invariant checks for structure/status maps/pre-test data-integrity/package zip hygiene, and local Node regression checks for permission/security/import/Data Quality/My Work contracts.
+- The root browser app still has no package-managed frontend build, lint, or TypeScript configuration. Backend v1 now has its own `backend/package.json`, TypeScript build, package-managed Azure Functions Core Tools dependency, `mssql`, and SQL DDL migration scaffold. Current browser validation remains Python build, generated data dictionary check, Node syntax checks, invariant checks for structure/status maps/pre-test data-integrity/package zip hygiene, and local Node regression checks for permission/security/import/Data Quality/My Work contracts.
+- Local backend runtime proof is environment-dependent, but Backend v1 Gate 1 has now been proven locally against Docker SQL Server in this Codex desktop environment. Bundled Node/pnpm and package-managed Azure Functions Core Tools are available; SQL Server LocalDB, `sqlcmd`, and global Azure Functions Core Tools are not installed. Validation used a disposable `mcr.microsoft.com/mssql/server:2022-latest` container, applied `backend/db/001_init.sql`, and returned a healthy `/api/health` SQL response.
 - Browser/client-side permission checks are not sufficient for production security. Firestore rules and authenticated identity must enforce access server-side before go-live.
 - Demo mode still contains demo aids such as role switching. The guarded demo purge code remains for isolated reset testing, but `REF.demoResetEnabled` is disabled by default and must stay disabled for shared testing, pilot, and production builds.
 - SharePoint upload is not live; documents are metadata/link/demo-upload records only.

@@ -1,0 +1,8 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "SQL_CONNECTION_STRING": "Server=(localdb)\\MSSQLLocalDB;Database=PhoenixProcurementBackend;Trusted_Connection=True;TrustServerCertificate=True"
+  }
+}
