@@ -143,8 +143,10 @@ Backend v1 scaffold:
   - `import_audit`
 - SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
 - Phoenix-owned operational state is represented separately from ERP/provenance columns so the later sync upsert can preserve it.
-- `backend/src/sources/dwSource.ts` reads fixture purchase orders for Gate 2 and normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape.
+- `backend/src/sources/dwSource.ts` reads fixture purchase orders, normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape, and applies backend classification.
+- `backend/src/warehouse/classification.ts` ports the browser import-rule baseline and order-type rules for backend `function` / `orderType` derivation before SQL upsert.
 - `backend/test/dwSource.test.ts` guards the backend field list against drift from `src/warehouseAdapter.js`.
+- `backend/test/classification.test.ts` guards baseline rule drift against `src/importRules.js` and exercises canonical Phoenix, Seychelles Breweries, and Edena classifier cases.
 - `backend/src/sql/client.ts` exposes `queryParams(sqlText, params)` for future parameterized SQL upserts.
 - `docs/BACKEND_HANDOFF.md` is the current backend gate handoff and sequencing source.
 

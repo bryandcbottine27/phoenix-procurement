@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PurchaseOrderContract } from "../warehouse/contract";
+import { classifyPurchaseOrder } from "../warehouse/classification";
 import { normalisePurchaseOrder, PurchaseOrderNormaliseOptions } from "../warehouse/normalisePurchaseOrder";
 
 export interface FetchPurchaseOrdersOptions extends PurchaseOrderNormaliseOptions {
@@ -28,7 +29,7 @@ export async function fetchPurchaseOrders(options: FetchPurchaseOrdersOptions = 
   const fixturePath = options.fixturePath ? path.resolve(options.fixturePath) : defaultFixturePath();
   const raw = await readFile(fixturePath, "utf8");
   const rows = rowsFromFixture(JSON.parse(raw));
-  return rows.map(row => normalisePurchaseOrder(row, options));
+  return rows.map(row => classifyPurchaseOrder(normalisePurchaseOrder(row, options)));
 }
 
 export const dwSource = {

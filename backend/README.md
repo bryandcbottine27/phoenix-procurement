@@ -72,12 +72,18 @@ Create the database before running migrations if your SQL login cannot create it
 
 ## Next Gates
 
-Gate 2 adds the fixture-backed `dwSource.fetchPurchaseOrders()` and mapping to
+Gate 2 added the fixture-backed `dwSource.fetchPurchaseOrders()` and mapping to
 the `PXWarehouse.ORDER_CONTRACT_FIELDS` contract. The backend keeps a local copy
 of that field list, guarded by a unit test that reads `src/warehouseAdapter.js`
 and fails on drift.
 
-Gate 3 will implement transactional ownership-safe upsert keyed on
+Gate 3a added backend classification in `src/warehouse/classification.ts`.
+Fixture purchase orders now receive derived `function` and `orderType` values
+using the browser import-rule baseline and the approved Phoenix/Seychelles/Edena
+order-type logic. `test/classification.test.ts` guards drift against
+`../src/importRules.js` and covers the canonical classifier cases.
+
+Gate 3b will implement transactional ownership-safe upsert keyed on
 `(entity, orderId)`, preserving Phoenix-owned operational data. All Gate 3 SQL
 upsert statements must use parameterized `mssql` requests for external values;
 no fixture, warehouse, or user-provided value may be interpolated into SQL text.

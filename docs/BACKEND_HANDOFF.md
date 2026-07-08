@@ -86,6 +86,16 @@ Cleanup commit message:
 
 Gate 3a is unit-testable and does not require SQL.
 
+Implementation status:
+
+- Implemented in `backend/src/warehouse/classification.ts`.
+- `backend/src/sources/dwSource.ts` applies classification after contract
+  normalisation.
+- Covered by `backend/test/classification.test.ts` plus the existing
+  `backend/test/dwSource.test.ts` fixture assertions.
+- Gate 3b remains the next approved review gate and must preserve the ownership
+  boundary.
+
 Objective:
 
 The connector classifies `function` and `orderType` before SQL upsert.

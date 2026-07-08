@@ -99,6 +99,9 @@ test("dwSource.fetchPurchaseOrders returns fixture rows normalized to the order 
   assert.equal(orders[1].erpShipmentMethod, "SEA");
 
   assert.equal(orders[2].erpCompany, "EDENA-BC");
+  assert.equal(orders[2].currency, "USD");
+  assert.equal(orders[2].function, "technical");
+  assert.equal(orders[2].orderType, "foreign");
   assert.equal(orders[2].warehouseLoadedAt, "2026-07-08T12:00:00.000Z");
 });
 
