@@ -64,6 +64,10 @@ Example connection string:
 Server=localhost,14333;Database=PhoenixProcurementBackend;User Id=sa;Password=Your_strong_password123;Encrypt=True;TrustServerCertificate=True
 ```
 
+`TrustServerCertificate=True` is for local development only. Production SQL
+connections should use trusted certificates and the final IT-approved encryption
+configuration.
+
 Create the database before running migrations if your SQL login cannot create it.
 
 ## Next Gates

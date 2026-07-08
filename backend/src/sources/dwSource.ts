@@ -12,7 +12,7 @@ type FixturePayload = {
 };
 
 function defaultFixturePath(): string {
-  return path.resolve(process.cwd(), "fixtures", "purchase-orders.json");
+  return path.resolve(__dirname, "../../../fixtures/purchase-orders.json");
 }
 
 function rowsFromFixture(payload: unknown): Record<string, unknown>[] {

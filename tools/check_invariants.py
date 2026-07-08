@@ -20,7 +20,7 @@ These are the same checks that were previously done by hand during code audits:
 
 Run:  python3 tools/check_invariants.py
 """
-import os, re, sys, glob
+import os, re, sys, glob, zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -175,6 +175,62 @@ def main():
     missing_zips = sorted(approved_zips - root_zips)
     check("only approved package zips exist", not extra_zips and not missing_zips,
           f"extra: {extra_zips}; missing: {missing_zips}")
+
+    zip_failures = []
+    required_common = {
+        'index.html', 'build.py', 'AGENTS.md', 'README.md',
+        'src/core.js', 'styles/main.css', 'tools/package.py',
+        'backend/package.json', 'backend/src/sql/client.ts', 'backend/db/001_init.sql',
+        'docs/BACKEND_HANDOFF.md'
+    }
+    forbidden_fragments = [
+        '/node_modules/', 'backend/dist/', 'backend/local.settings.json',
+        '/.git/', 'scratchpadall_functions.txt', 'backend/secrets/'
+    ]
+    forbidden_suffixes = ('.key', '.pem', '.pfx')
+    for zip_name in sorted(approved_zips):
+        zip_path = os.path.join(ROOT, zip_name)
+        if not os.path.exists(zip_path):
+            continue
+        try:
+            with zipfile.ZipFile(zip_path) as zf:
+                entries = set(zf.namelist())
+        except zipfile.BadZipFile:
+            zip_failures.append(f"{zip_name}: invalid zip")
+            continue
+        missing_required = sorted(required_common - entries)
+        if missing_required:
+            zip_failures.append(f"{zip_name}: missing full-snapshot entries {missing_required}")
+        if 'DEMO' in zip_name:
+            if 'dist/phoenix-procurement-DEMO.html' not in entries:
+                zip_failures.append(f"{zip_name}: missing demo dist")
+            if 'dist/phoenix-procurement-PRODUCTION.html' in entries:
+                zip_failures.append(f"{zip_name}: contains production dist")
+        if 'PRODUCTION' in zip_name:
+            if 'dist/phoenix-procurement-PRODUCTION.html' not in entries:
+                zip_failures.append(f"{zip_name}: missing production dist")
+            if 'dist/phoenix-procurement-DEMO.html' in entries:
+                zip_failures.append(f"{zip_name}: contains demo dist")
+        bad_entries = []
+        for entry in entries:
+            clean = entry.replace('\\', '/')
+            lower = clean.lower()
+            wrapped = '/' + lower
+            name = os.path.basename(lower)
+            if any(fragment in wrapped for fragment in forbidden_fragments):
+                bad_entries.append(clean)
+            elif '/__pycache__/' in wrapped or name.endswith('.pyc'):
+                bad_entries.append(clean)
+            elif name.endswith(forbidden_suffixes):
+                bad_entries.append(clean)
+            elif name in {'.env'} or name.startswith('.env.'):
+                bad_entries.append(clean)
+            elif name.endswith('.json') and ('service-account' in name or 'connection' in name):
+                bad_entries.append(clean)
+        if bad_entries:
+            zip_failures.append(f"{zip_name}: forbidden entries {sorted(bad_entries)[:8]}")
+    check("package zips exclude generated dependencies and secrets", not zip_failures,
+          f"issues: {zip_failures}")
 
     print()
     if FAILURES:

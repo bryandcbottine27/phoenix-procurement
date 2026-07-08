@@ -6,6 +6,9 @@ node_modules/
 backend/dist/
 backend/coverage/
 
+# Packaging scratch/stale local artifacts
+F*scratchpadall_functions.txt
+
 # Local configuration and secrets
 backend/local.settings.json
 backend/.env
@@ -22,6 +25,8 @@ backend/**/*connection*.json
 # Tooling noise
 .azure/
 .vscode/.azure/
+__pycache__/
+*.pyc
 *.log
 firebase-debug.log
 firestore-debug.log

@@ -58,8 +58,11 @@ content and work on `file://` / OneDrive, no server needed.
 
 **Package zips:** keep only two package files in the project root:
 `Phoenix Procurement DEMO FULL.zip` and `Phoenix Procurement PRODUCTION FULL.zip`.
-When packaging is refreshed, replace those two files only. Do not add timestamped or
-`pre-*` backup zips; Git commits/tags are the release history.
+When packaging is refreshed, replace those two files only by running
+`python tools/package.py` after a green `python build.py`. Do not add timestamped
+or `pre-*` backup zips; Git commits/tags are the release history. Both zips are
+full snapshots and intentionally include backend source, while excluding
+`node_modules`, backend build output, local settings, and secret/key files.
 
 ---
 
@@ -160,6 +163,7 @@ field shape. `src/erpAdapter.js` keeps the older `PhoenixERP` API alive for exis
 its implementation now points to the warehouse path.
 
 See `/docs/DATA_WAREHOUSE_INTEGRATION.md` for the concise IT-facing contract.
+See `/docs/BACKEND_HANDOFF.md` for the current backend-gate handoff.
 
 ERP/DW-owned fields remain read-only or ERP-seeded in Phoenix. Phoenix-owned operational fields
 such as status, shipments, milestones, payment-request workflow, documents, follow-ups, issues,

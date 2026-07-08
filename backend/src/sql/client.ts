@@ -3,6 +3,8 @@ import { requireSqlConnectionString } from "../config";
 
 let poolPromise: Promise<ConnectionPool> | null = null;
 
+export type SqlParams = Record<string, unknown>;
+
 export function getSqlPool(): Promise<ConnectionPool> {
   if (!poolPromise) {
     const connectionString = requireSqlConnectionString();
@@ -18,6 +20,15 @@ export function getSqlPool(): Promise<ConnectionPool> {
 export async function querySql<T = unknown>(sqlText: string): Promise<IResult<T>> {
   const pool = await getSqlPool();
   return pool.request().query<T>(sqlText);
+}
+
+export async function queryParams<T = unknown>(sqlText: string, params: SqlParams = {}): Promise<IResult<T>> {
+  const pool = await getSqlPool();
+  const request = pool.request();
+  for (const [name, value] of Object.entries(params)) {
+    request.input(name, value);
+  }
+  return request.query<T>(sqlText);
 }
 
 export async function pingSql(): Promise<boolean> {

@@ -43,7 +43,7 @@ The generated artifact is:
 7. Runs structural, high-risk data-integrity, and package-hygiene invariants in `tools/check_invariants.py`.
 8. Runs local role/security/data regression checks in `tools/regression_checks.js` when Node is available.
 
-The production package is generated from the same source with production settings in `APP_CONFIG`.
+`tools/package.py` rebuilds the two approved full-snapshot zip packages after a green build. The demo package keeps the demo dist file. The production package stages a copy with production `APP_CONFIG` values and `dist/phoenix-procurement-PRODUCTION.html`. Package invariants reject generated dependencies, backend build output, local settings, secrets, and scratchpad artifacts inside the zips.
 
 ## Frontend architecture
 
@@ -145,6 +145,8 @@ Backend v1 scaffold:
 - Phoenix-owned operational state is represented separately from ERP/provenance columns so the later sync upsert can preserve it.
 - `backend/src/sources/dwSource.ts` reads fixture purchase orders for Gate 2 and normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape.
 - `backend/test/dwSource.test.ts` guards the backend field list against drift from `src/warehouseAdapter.js`.
+- `backend/src/sql/client.ts` exposes `queryParams(sqlText, params)` for future parameterized SQL upserts.
+- `docs/BACKEND_HANDOFF.md` is the current backend gate handoff and sequencing source.
 
 Planned backend/integration services:
 

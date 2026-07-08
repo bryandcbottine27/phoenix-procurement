@@ -53,6 +53,8 @@ If the change touches fields or collections, read and update `src/schema.js`. Do
 - Every package update/amendment must replace those two files only.
 - Demo package keeps the demo build (`dist/phoenix-procurement-DEMO.html`).
 - Production package keeps the production build (`dist/phoenix-procurement-PRODUCTION.html`) with `demoMode: false` and `authMode: 'password'`.
+- Use `python tools/package.py` to refresh both zips after a green `python build.py`.
+- Both zips are full snapshots and intentionally include `backend/` source. They must not include `node_modules/`, `backend/dist/`, `backend/local.settings.json`, secret/key files, `.git/`, or local scratchpad artifacts.
 - Use Git commits/tags for history instead of accumulating package backup zips.
 
 ## Data and write rules
@@ -131,6 +133,8 @@ This currently performs:
 The root browser app still has no package-managed frontend build, lint runner, TypeScript checker, Firebase emulator, or Firebase rules validation command. The local browser regression harness is `tools/regression_checks.js` and is run by `build.py`.
 
 Backend work is isolated under `backend/` and has its own `package.json`, TypeScript build, Azure Functions Core Tools dependency, `mssql`, and SQL DDL migration scaffold. Backend validation is separate from the browser gate and requires a local SQL Server instance for runtime/integration proof.
+
+Backend gate handoff lives in `docs/BACKEND_HANDOFF.md`; read it before continuing Backend v1 work.
 
 ## Current continuity note
 
