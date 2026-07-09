@@ -108,6 +108,21 @@ the raw `phoenix_data` ownership-boundary blob; SQL `status` is exposed only as
 `initialOperationalStatus` because it is seeded on insert and is not live
 Phoenix operational state in the SQL-only feed.
 
+KPI read endpoint:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/kpis?entity=Phoenix"
+```
+
+`GET /api/kpis` is a read-only, function-key protected aggregation endpoint over
+the SQL order store. It supports optional `entity`, `dateFrom`, and `dateTo`
+scope filters. It returns order-only counts, spend grouped by currency, MTTO,
+open-order ageing, requested-receipt exposure, data-quality counts, latest sync
+audit metadata, and a `coverage` block. The coverage block deliberately excludes
+OTIF, cycle time through GRN/shipment stages, supplier scorecards, and live
+Phoenix operational status because shipment, payment, GRN, and live Phoenix
+operational data are not in SQL yet.
+
 ## Docker SQL Server Example
 
 ```powershell
@@ -155,6 +170,7 @@ idempotent re-run, ownership preservation, malformed and unclassified
 exceptions, decimal precision, lowercase status mapping, and line grouping.
 
 F1a added `GET /api/orders` as the first read-side endpoint for BI/future browser
-consumers. F1b will add honest order-only KPI aggregations and coverage metadata;
-F1c will expand this README with the full endpoint contract, Power BI consumption
-note, and real-SQL/Data Warehouse swap points.
+consumers. F1b added honest order-only KPI aggregations and coverage metadata in
+`GET /api/kpis`, with optional live SQL integration coverage. F1c will expand
+this README with the full endpoint contract, Power BI consumption note, optional
+read indexes, and real-SQL/Data Warehouse swap points.

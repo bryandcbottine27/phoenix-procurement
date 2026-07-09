@@ -266,8 +266,22 @@ F1a implementation status:
 - Covered by `backend/test/ordersRead.test.ts` and optional live SQL coverage in
   `backend/test/ordersRead.integration.test.ts`.
 
+F1b implementation status:
+
+- Implemented `GET /api/kpis` in `backend/src/functions/kpis.ts`.
+- KPI query logic lives in `backend/src/kpi/queries.ts`.
+- Coverage metadata lives in `backend/src/kpi/shape.ts`.
+- The endpoint is function-key protected, read-only, typed-parameterized, and
+  scoped by optional `entity`, `dateFrom`, and `dateTo` filters.
+- It returns order-only counts, spend grouped by currency, MTTO aligned to the
+  browser `calcOrderMTTO` definition, open-order ageing, requested-receipt
+  proxy exposure, data-quality counts, latest sync audit metadata, and explicit
+  coverage exclusions for OTIF, cycle time through GRN/shipment stages, supplier
+  scorecards, and live Phoenix operational status.
+- Covered by `backend/test/kpisRead.test.ts` and optional live SQL coverage in
+  `backend/test/kpisRead.integration.test.ts`.
+
 Remaining F1 gates:
 
-1. F1b - order-only KPI aggregations with coverage metadata.
-2. F1c - README endpoint contract, Power BI consumption note, real-SQL/Data
+1. F1c - README endpoint contract, Power BI consumption note, real-SQL/Data
    Warehouse swap points, and optional read indexes.

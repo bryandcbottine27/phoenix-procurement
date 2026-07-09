@@ -149,11 +149,13 @@ Backend v1 scaffold:
 - `backend/src/functions/syncPurchaseOrders.ts` exposes `POST /api/sync/purchase-orders` for the fixture-backed WD sync.
 - `backend/src/functions/syncPurchaseOrdersTimer.ts` registers a disabled-by-default timer stub controlled by `DW_SYNC_TIMER_ENABLED`.
 - `backend/src/functions/orders.ts` exposes read-only `GET /api/orders` with function-key auth, typed parameterized filters, allowlisted sorting, and paginated SQL results for BI/future browser consumers.
-- `backend/src/kpi/queries.ts` and `backend/src/kpi/shape.ts` contain the first read-side query/mapping layer. The order mapper omits `phoenix_data` and labels SQL `status` as `initialOperationalStatus`.
+- `backend/src/functions/kpis.ts` exposes read-only `GET /api/kpis` with function-key auth and order-only aggregations for BI/future browser consumers.
+- `backend/src/kpi/queries.ts` and `backend/src/kpi/shape.ts` contain the first read-side query/mapping layer. The order mapper omits `phoenix_data` and labels SQL `status` as `initialOperationalStatus`. KPI shape helpers include explicit coverage metadata for excluded shipment/payment/GRN-derived metrics.
 - `backend/test/dwSource.test.ts` guards the backend field list against drift from `src/warehouseAdapter.js`.
 - `backend/test/classification.test.ts` guards baseline rule drift against `src/importRules.js` and exercises canonical Phoenix, Seychelles Breweries, and Edena classifier cases.
 - `backend/test/purchaseOrderSync.test.ts` guards grouping, initial status seeding, sync exception queueing, parameterized SQL shape, and the update-time ownership boundary.
 - `backend/test/ordersRead.test.ts` and optional `backend/test/ordersRead.integration.test.ts` guard the F1a order-list endpoint, including sort injection rejection, pagination, read-only SQL shape, and live SQL pagination when `RUN_SQL_INTEGRATION=true`.
+- `backend/test/kpisRead.test.ts` and optional `backend/test/kpisRead.integration.test.ts` guard the F1b KPI endpoint, including multi-currency spend buckets, MTTO, ageing, requested-receipt proxy handling, data-quality counts, coverage metadata, and read-only live SQL behaviour.
 - `backend/src/sql/client.ts` exposes `queryParams(sqlText, params)` and transaction-bound execution for parameterized SQL upserts.
 - `docs/BACKEND_HANDOFF.md` is the current backend gate handoff and sequencing source.
 
@@ -230,6 +232,7 @@ Current backend HTTP API scaffold:
 
 - `GET /api/health` in `backend/src/functions/health.ts`, anonymous, returns SQL connectivity status.
 - `GET /api/orders` in `backend/src/functions/orders.ts`, function-auth, lists SQL orders with filters, allowlisted sorting, and pagination.
+- `GET /api/kpis` in `backend/src/functions/kpis.ts`, function-auth, returns order-only KPI aggregations with an explicit coverage block for metrics not derivable from the SQL order store.
 - `POST /api/sync/purchase-orders` in `backend/src/functions/syncPurchaseOrders.ts`, function-auth, runs the fixture-backed purchase-order sync.
 
 No browser screen currently calls this backend API.

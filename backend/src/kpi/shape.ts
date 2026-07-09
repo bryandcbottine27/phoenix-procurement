@@ -124,3 +124,10 @@ export function mapOrderRow(row: OrderSqlRow): Record<string, unknown> {
     isClosed: row.is_closed === true || row.is_closed === 1
   };
 }
+
+export function coverageBlock(): { excluded: string[]; reason: string } {
+  return {
+    excluded: ["otif", "cycleTimeThroughGrn", "supplierScorecards", "liveOperationalStatus"],
+    reason: "Shipment/payment/GRN and live Phoenix operational data are not in SQL yet (WD connector syncs ERP order data only)."
+  };
+}
