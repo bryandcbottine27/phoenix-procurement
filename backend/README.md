@@ -52,6 +52,23 @@ Invoke-RestMethod http://localhost:7071/api/health
 The health check returns `200` only when the SQL connection can run `SELECT 1`.
 Missing or invalid SQL configuration returns `503`.
 
+Warehouse sync endpoint:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:7071/api/sync/purchase-orders
+```
+
+The sync endpoint reads the fixture-backed `dwSource` for now, groups duplicate
+line rows by `(entity, orderId)`, validates them, and upserts into SQL Server
+inside a transaction. Existing rows refresh ERP/provenance/classification fields
+only; `status`, `is_closed`, and `phoenix_data` are not updated on existing rows.
+Malformed rows are written to `sync_exceptions`, and every batch writes one
+`import_audit` row.
+
+The timer function is registered as a safe stub and does nothing unless
+`DW_SYNC_TIMER_ENABLED=true`. Use `DW_SYNC_CRON` to override the default schedule
+when the real Data Warehouse feed is ready.
+
 ## Docker SQL Server Example
 
 ```powershell
@@ -83,10 +100,12 @@ using the browser import-rule baseline and the approved Phoenix/Seychelles/Edena
 order-type logic. `test/classification.test.ts` guards drift against
 `../src/importRules.js` and covers the canonical classifier cases.
 
-Gate 3b will implement transactional ownership-safe upsert keyed on
+Gate 3b added transactional ownership-safe upsert keyed on
 `(entity, orderId)`, preserving Phoenix-owned operational data. All Gate 3 SQL
 upsert statements must use parameterized `mssql` requests for external values;
 no fixture, warehouse, or user-provided value may be interpolated into SQL text.
+`test/purchaseOrderSync.test.ts` covers grouping, status seeding, exception
+queueing, ownership preservation on updates, and parameterized SQL structure.
 
 Gate 4 will add integration tests against local SQL and document the real Data
 Warehouse swap point.

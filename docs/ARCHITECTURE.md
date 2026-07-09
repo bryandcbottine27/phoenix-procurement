@@ -142,12 +142,16 @@ Backend v1 scaffold:
   - `sync_exceptions`
   - `import_audit`
 - SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
-- Phoenix-owned operational state is represented separately from ERP/provenance columns so the later sync upsert can preserve it.
+- Phoenix-owned operational state is represented separately from ERP/provenance columns so the sync upsert can preserve it.
 - `backend/src/sources/dwSource.ts` reads fixture purchase orders, normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape, and applies backend classification.
 - `backend/src/warehouse/classification.ts` ports the browser import-rule baseline and order-type rules for backend `function` / `orderType` derivation before SQL upsert.
+- `backend/src/sync/purchaseOrderSync.ts` performs transactional ownership-safe upsert keyed by `(entity, order_id)`, updating ERP/provenance/classification columns only for existing rows and seeding Phoenix `status` only on new rows.
+- `backend/src/functions/syncPurchaseOrders.ts` exposes `POST /api/sync/purchase-orders` for the fixture-backed WD sync.
+- `backend/src/functions/syncPurchaseOrdersTimer.ts` registers a disabled-by-default timer stub controlled by `DW_SYNC_TIMER_ENABLED`.
 - `backend/test/dwSource.test.ts` guards the backend field list against drift from `src/warehouseAdapter.js`.
 - `backend/test/classification.test.ts` guards baseline rule drift against `src/importRules.js` and exercises canonical Phoenix, Seychelles Breweries, and Edena classifier cases.
-- `backend/src/sql/client.ts` exposes `queryParams(sqlText, params)` for future parameterized SQL upserts.
+- `backend/test/purchaseOrderSync.test.ts` guards grouping, initial status seeding, sync exception queueing, parameterized SQL shape, and the update-time ownership boundary.
+- `backend/src/sql/client.ts` exposes `queryParams(sqlText, params)` and transaction-bound execution for parameterized SQL upserts.
 - `docs/BACKEND_HANDOFF.md` is the current backend gate handoff and sequencing source.
 
 Planned backend/integration services:
@@ -222,6 +226,7 @@ Important limitation:
 Current backend HTTP API scaffold:
 
 - `GET /api/health` in `backend/src/functions/health.ts`, anonymous, returns SQL connectivity status.
+- `POST /api/sync/purchase-orders` in `backend/src/functions/syncPurchaseOrders.ts`, function-auth, runs the fixture-backed purchase-order sync.
 
 No browser screen currently calls this backend API.
 

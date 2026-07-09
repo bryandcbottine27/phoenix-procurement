@@ -1,4 +1,4 @@
-import { ConnectionPool, IResult } from "mssql";
+import { ConnectionPool, IResult, Transaction } from "mssql";
 import { requireSqlConnectionString } from "../config";
 
 let poolPromise: Promise<ConnectionPool> | null = null;
@@ -22,13 +22,34 @@ export async function querySql<T = unknown>(sqlText: string): Promise<IResult<T>
   return pool.request().query<T>(sqlText);
 }
 
-export async function queryParams<T = unknown>(sqlText: string, params: SqlParams = {}): Promise<IResult<T>> {
-  const pool = await getSqlPool();
+export type SqlQueryExecutor = <T = unknown>(sqlText: string, params?: SqlParams) => Promise<IResult<T>>;
+
+export async function queryParams<T = unknown>(
+  sqlText: string,
+  params: SqlParams = {},
+  executor?: ConnectionPool | Transaction
+): Promise<IResult<T>> {
+  const pool = executor || await getSqlPool();
   const request = pool.request();
   for (const [name, value] of Object.entries(params)) {
     request.input(name, value);
   }
   return request.query<T>(sqlText);
+}
+
+export async function withTransaction<T>(work: (query: SqlQueryExecutor) => Promise<T>): Promise<T> {
+  const pool = await getSqlPool();
+  const transaction = new Transaction(pool);
+  await transaction.begin();
+  const query: SqlQueryExecutor = (sqlText, params = {}) => queryParams(sqlText, params, transaction);
+  try {
+    const result = await work(query);
+    await transaction.commit();
+    return result;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 export async function pingSql(): Promise<boolean> {

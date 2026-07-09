@@ -197,7 +197,8 @@ Scope:
 - Gate 2 adds fixture-backed `dwSource.fetchPurchaseOrders()`, backend purchase-order normalisation, and a drift-guard test against `src/warehouseAdapter.js`.
 - Cleanup pass adds durable backend handoff documentation, formal full-snapshot packaging, zip-content invariants, scratchpad removal, a parameterized SQL helper, and local-dev SQL certificate guidance.
 - Gate 3a adds backend `function` and `orderType` classification, including a drift guard against `src/importRules.js` and canonical Phoenix/Seychelles/Edena unit tests.
-- Next backend gates: ownership-safe transactional upsert, then SQL integration tests and full backend README.
+- Gate 3b adds ownership-safe transactional SQL upsert, `sync_exceptions` queueing, per-batch `import_audit`, HTTP sync trigger, disabled timer stub, and unit tests for grouping/ownership/parameterization.
+- Next backend gate: SQL integration tests and full backend README.
 - Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
 Acceptance criteria:

@@ -148,6 +148,18 @@ Objective:
 Port the safe import/upsert behaviour from `src/modules/reports/erpImport.js`
 into the SQL backend.
 
+Implementation status:
+
+- Implemented in `backend/src/sync/purchaseOrderSync.ts`.
+- `backend/src/sql/client.ts` now supports transaction-bound `queryParams`.
+- `POST /api/sync/purchase-orders` is wired in
+  `backend/src/functions/syncPurchaseOrders.ts`.
+- A disabled-by-default timer stub is wired in
+  `backend/src/functions/syncPurchaseOrdersTimer.ts`.
+- Covered by `backend/test/purchaseOrderSync.test.ts`.
+- Gate 4 remains responsible for SQL-backed integration tests against LocalDB or
+  Docker SQL Server.
+
 Requirements:
 
 - Use only the parameterized helper from cleanup C3 for external values.
