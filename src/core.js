@@ -810,20 +810,20 @@ const REF = {
   viewAccess: {
     procurement_senior_manager: { hidden: ['mywork'], viewOnly: ['clearance','closedorders','containers','documents','forecast','officers','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','partials','paymentexposure','payments','shipments','taxprovision'] },
     sc_manager: { hidden: ['mywork','orders-foreign-indirect','orders-foreign-technical','orders-local-indirect','orders-local-technical'], viewOnly: ['closedorders','documents','forecast','officers','paymentexposure','payments','taxprovision'] },
-    sc_officer: { hidden: ['teamwork','dqcockpit','erpimportrules','erprecon','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-technical','orders-local-indirect','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','taxprovision'] },
+    sc_officer: { hidden: ['teamwork','dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-technical','orders-local-indirect','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','supplierchase','taxprovision'] },
     procurement_technical_manager: { hidden: ['mywork','orders-foreign-indirect','orders-foreign-supplychain','orders-local-indirect','orders-local-supplychain'], viewOnly: ['closedorders','documents','forecast','officers','paymentexposure','payments','taxprovision'] },
-    procurement_technical_officer: { hidden: ['teamwork','dqcockpit','erpimportrules','erprecon','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-supplychain','orders-local-indirect','orders-local-supplychain','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','taxprovision'] },
+    procurement_technical_officer: { hidden: ['teamwork','dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-supplychain','orders-local-indirect','orders-local-supplychain','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','supplierchase','taxprovision'] },
     procurement_indirect_manager: { hidden: ['mywork','orders-foreign-supplychain','orders-foreign-technical','orders-local-supplychain','orders-local-technical'], viewOnly: ['closedorders','documents','forecast','officers','paymentexposure','payments','taxprovision'] },
-    procurement_indirect_officer: { hidden: ['teamwork','dqcockpit','erpimportrules','erprecon','managementpack','mgmtcockpit','officers','orders-foreign-supplychain','orders-foreign-technical','orders-local-supplychain','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','taxprovision'] },
-    procurement_technical_supervisor: { hidden: ['dqcockpit','erpimportrules','erprecon','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-supplychain','orders-local-indirect','orders-local-supplychain','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','taxprovision'] },
-    procurement_indirect_supervisor: { hidden: ['dqcockpit','erpimportrules','erprecon','managementpack','mgmtcockpit','officers','orders-foreign-supplychain','orders-foreign-technical','orders-local-supplychain','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','taxprovision'] },
-    sc_supervisor: { hidden: ['dqcockpit','erpimportrules','erprecon','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-technical','orders-local-indirect','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','taxprovision'] },
+    procurement_indirect_officer: { hidden: ['teamwork','dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','managementpack','mgmtcockpit','officers','orders-foreign-supplychain','orders-foreign-technical','orders-local-supplychain','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','supplierchase','taxprovision'] },
+    procurement_technical_supervisor: { hidden: ['dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-supplychain','orders-local-indirect','orders-local-supplychain','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','supplierchase','taxprovision'] },
+    procurement_indirect_supervisor: { hidden: ['dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','managementpack','mgmtcockpit','officers','orders-foreign-supplychain','orders-foreign-technical','orders-local-supplychain','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','supplierchase','taxprovision'] },
+    sc_supervisor: { hidden: ['dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','managementpack','mgmtcockpit','officers','orders-foreign-indirect','orders-foreign-technical','orders-local-indirect','orders-local-technical','paymentexposure','workingcalendars','workload'], viewOnly: ['exceptions','kpitrends','opcalendar','otifrisk','scorecards','supplierchase','taxprovision'] },
     logistics_manager: { hidden: ['erpimportrules'], viewOnly: ['closedorders', 'forecast', 'officers', 'orders-foreign-indirect', 'orders-foreign-supplychain', 'orders-foreign-technical', 'orders-local-indirect', 'orders-local-supplychain', 'orders-local-technical', 'paymentexposure', 'payments', 'suppliers'] },
-    logistics_officer: { hidden: ['teamwork','dqcockpit','erpimportrules','erprecon','kpitrends','managementpack','mgmtcockpit','officers','paymentexposure','workingcalendars','workload'], viewOnly: ['closedorders', 'forecast', 'orders-foreign-indirect', 'orders-foreign-supplychain', 'orders-foreign-technical', 'orders-local-indirect', 'orders-local-supplychain', 'orders-local-technical', 'otifrisk', 'payments', 'scorecards', 'suppliers'] },
-    demand_supervisor: { hidden: ['erpimportrules','erprecon','forecast','managementpack','mywork','officers','paymentexposure','payments','taxprovision','workingcalendars'], viewOnly: ['clearance','closedorders','containers','documents','dqcockpit','exceptions','kpitrends','mgmtcockpit','opcalendar','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','otifrisk','partials','scorecards','shipments','suppliers','workload'] },
-    demand_officer: { hidden: ['teamwork','dqcockpit','erpimportrules','erprecon','forecast','kpitrends','managementpack','mgmtcockpit','mywork','officers','paymentexposure','payments','scorecards','taxprovision','workingcalendars','workload'], viewOnly: ['clearance','closedorders','containers','documents','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','otifrisk','partials','shipments','suppliers'] },
-    finance: { hidden: ['teamwork','clearance','closedorders','containers','dashboard','documents','dqcockpit','erpimportrules','erprecon','exceptions','exports','kpitrends','managementpack','mgmtcockpit','mywork','officers','opcalendar','otifrisk','partials','reports','scorecards','shipments','suppliers','workingcalendars','workload'], viewOnly: ['orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','paymentexposure','payments'] },
-    stakeholder: { hidden: ['teamwork','clearance','closedorders','containers','dashboard','dqcockpit','erpimportrules','erprecon','exceptions','forecast','kpitrends','managementpack','mgmtcockpit','mywork','officers','opcalendar','otifrisk','partials','paymentexposure','payments','reports','scorecards','suppliers','taxprovision','workingcalendars','workload'], viewOnly: ['documents','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','shipments'] },
+    logistics_officer: { hidden: ['teamwork','dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','kpitrends','managementpack','mgmtcockpit','officers','paymentexposure','supplierchase','workingcalendars','workload'], viewOnly: ['closedorders', 'forecast', 'orders-foreign-indirect', 'orders-foreign-supplychain', 'orders-foreign-technical', 'orders-local-indirect', 'orders-local-supplychain', 'orders-local-technical', 'otifrisk', 'payments', 'scorecards', 'suppliers'] },
+    demand_supervisor: { hidden: ['erpimportrules','erprecon','forecast','managementpack','mywork','officers','paymentexposure','payments','taxprovision','workingcalendars'], viewOnly: ['clearance','closedorders','containers','dailycontrol','documents','dqcockpit','exceptions','exceptionworkbench','kpitrends','mgmtcockpit','opcalendar','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','otifrisk','partials','scorecards','shipments','supplierchase','suppliers','workload'] },
+    demand_officer: { hidden: ['teamwork','dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','forecast','kpitrends','managementpack','mgmtcockpit','mywork','officers','paymentexposure','payments','scorecards','supplierchase','taxprovision','workingcalendars','workload'], viewOnly: ['clearance','closedorders','containers','documents','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','otifrisk','partials','shipments','suppliers'] },
+    finance: { hidden: ['teamwork','clearance','closedorders','containers','dailycontrol','dashboard','documents','dqcockpit','erpimportrules','erprecon','exceptions','exceptionworkbench','exports','kpitrends','managementpack','mgmtcockpit','mywork','officers','opcalendar','otifrisk','partials','reports','scorecards','shipments','supplierchase','suppliers','workingcalendars','workload'], viewOnly: ['orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','paymentexposure','payments'] },
+    stakeholder: { hidden: ['teamwork','clearance','closedorders','containers','dailycontrol','dashboard','dqcockpit','erpimportrules','erprecon','exceptions','exceptionworkbench','forecast','kpitrends','managementpack','mgmtcockpit','mywork','officers','opcalendar','otifrisk','partials','paymentexposure','payments','reports','scorecards','supplierchase','suppliers','taxprovision','workingcalendars','workload'], viewOnly: ['documents','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','shipments'] },
   },
 
   packagingUnits: [
@@ -1698,7 +1698,9 @@ window.__viewTitle = function (view) {
     'payments': 'Payments', 'forecast': 'Payment Forecast',
     'paymentexposure': 'Payment Exposure', 'taxprovision': 'Tax Provision',
     'closedorders': 'Closed Orders', 'documents': 'Documents',
+    'dailycontrol': 'Daily Control Room',
     'mgmtcockpit': 'Management Cockpit', 'managementpack': 'Management Pack',
+    'supplierchase': 'Supplier Chase Plan', 'exceptionworkbench': 'Exception Workbench',
     'exceptions': 'Exceptions', 'dqcockpit': 'Data Quality', 'otifrisk': 'OTIF Risk',
     'workload': 'Workload', 'opcalendar': 'Operations Calendar', 'scorecards': 'Scorecards',
     'kpitrends': 'KPI Trends', 'reports': 'Reports', 'suppliers': 'Suppliers',
@@ -1954,7 +1956,9 @@ function navigate(view) {
     'erpimportrules': 'ERP Import Rules',
     'workingcalendars': 'Working Calendars',
     'reports': 'Reports & Export',
+    'dailycontrol': 'Daily Control Room',
     'mgmtcockpit': 'Management Cockpit',
+    'supplierchase': 'Supplier Chase Plan',
     'otifrisk': 'OTIF Risk Forecast',
     'workload': 'Officer Workload',
     'opcalendar': 'Operational Calendar',
@@ -1962,6 +1966,7 @@ function navigate(view) {
     'dqcockpit': 'Data Quality Cockpit',
     'scorecards': 'Supplier Scorecards',
     'exceptions': 'Exceptions',
+    'exceptionworkbench': 'Exception Workbench',
     'kpitrends': 'KPI Trends',
     'erprecon': 'ERP Reconciliation'
   };
@@ -1976,9 +1981,9 @@ function navigate(view) {
     'closedorders': 'Records & Archives', 'documents': 'Records & Archives',
     'suppliers': 'Reports & Controls',
     'officers': 'System Settings', 'erprecon': 'System Settings', 'erpimportrules': 'System Settings', 'workingcalendars': 'System Settings',
-    'reports': 'Reports & Controls', 'mgmtcockpit': 'Reports & Controls', 'otifrisk': 'Reports & Controls',
+    'reports': 'Reports & Controls', 'dailycontrol': 'Reports & Controls', 'mgmtcockpit': 'Reports & Controls', 'supplierchase': 'Reports & Controls', 'otifrisk': 'Reports & Controls',
     'workload': 'Reports & Controls', 'opcalendar': 'Reports & Controls', 'managementpack': 'Reports & Controls',
-    'dqcockpit': 'Reports & Controls', 'scorecards': 'Reports & Controls', 'exceptions': 'Reports & Controls', 'kpitrends': 'Reports & Controls'
+    'dqcockpit': 'Reports & Controls', 'scorecards': 'Reports & Controls', 'exceptions': 'Reports & Controls', 'exceptionworkbench': 'Reports & Controls', 'kpitrends': 'Reports & Controls'
   };
   window.__navSection = navSection;
   const sec = navSection[view];
@@ -1991,7 +1996,7 @@ function navigate(view) {
 }
 window.navigate = navigate;
 
-const CONTROL_SUMMARY_VIEWS = ['mgmtcockpit', 'otifrisk', 'workload', 'partials', 'clearance', 'paymentexposure', 'opcalendar', 'managementpack'];
+const CONTROL_SUMMARY_VIEWS = ['dailycontrol', 'mgmtcockpit', 'supplierchase', 'exceptionworkbench', 'otifrisk', 'workload', 'partials', 'clearance', 'paymentexposure', 'opcalendar', 'managementpack'];
 function isControlSummaryView(view) { return CONTROL_SUMMARY_VIEWS.includes(view); }
 
 /* ============================================================
@@ -2259,6 +2264,15 @@ function updateCounts() {
   }
   if (window.__exceptionsCount) {
     const exEl = $('#count-exceptions'); if (exEl) { const n = window.__exceptionsCount(); exEl.textContent = n; exEl.style.display = n ? '' : 'none'; }
+  }
+  if (window.__dailyControlCount) {
+    const el = $('#count-dailycontrol'); if (el) { const n = window.__dailyControlCount(); el.textContent = n; el.style.display = n ? '' : 'none'; }
+  }
+  if (window.__supplierChaseCount) {
+    const el = $('#count-supplierchase'); if (el) { const n = window.__supplierChaseCount(); el.textContent = n; el.style.display = n ? '' : 'none'; }
+  }
+  if (window.__exceptionWorkbenchCount) {
+    const el = $('#count-exceptionworkbench'); if (el) { const n = window.__exceptionWorkbenchCount(); el.textContent = n; el.style.display = n ? '' : 'none'; }
   }
   if (window.__mgmtCockpitCount) {
     const el = $('#count-mgmtcockpit'); if (el) { const n = window.__mgmtCockpitCount(); el.textContent = n; el.style.display = n ? '' : 'none'; }

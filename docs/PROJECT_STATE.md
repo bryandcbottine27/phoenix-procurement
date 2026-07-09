@@ -28,7 +28,7 @@ Important continuity note: this folder is now a Git repository. The starting han
 
 Core application foundation:
 
-- Modular JavaScript source tree with 62 source modules.
+- Modular JavaScript source tree with 63 source modules.
 - Single-file build via `build.py`.
 - Business Central-style top navigation, list pages, card pages, FastTabs, filter panes, and Phoenix colour theme.
 - Three-entity handling with active entity switcher.
@@ -107,8 +107,9 @@ Reference, reports, and controls:
 - Officers & Roles under System Settings.
 - ERP Reconciliation under System Settings.
 - ERP Import Rules and Working Calendars under System Settings.
-- Reports & Export, KPI Trends, OTIF Risk Forecast, Officer Workload, Operational Calendar, Management Pack, Exceptions, Data Quality, Supplier Scorecards.
-- Management Cockpit reorganized as a control entry point.
+- Reports & Export, Daily Control Room, Supplier Chase Plan, KPI Trends, OTIF Risk Forecast, Officer Workload, Operational Calendar, Management Pack, Exception Workbench, Exceptions, Data Quality, Supplier Scorecards.
+- Management Cockpit reorganized as a control entry point, with the Daily Control Room now acting as the operating cadence view for daily, weekly, and monthly routines.
+- Management Pack includes an executive summary and export rows for weekly/monthly review, not only detailed exception lines.
 
 Document handling:
 
@@ -147,7 +148,7 @@ Authentication and access:
 - Data Warehouse integration is partly scaffolded only. `PXWarehouse` defines the browser-side target shape and still returns "not connected"; the current operational feed remains Excel import. The isolated `backend/` Backend v1 scaffold now includes Azure Functions v4, TypeScript, `mssql`, SQL Server DDL, fixture-backed `dwSource.fetchPurchaseOrders()`, purchase-order normalisation, classification for `function` and `orderType`, an ownership-safe SQL upsert service with typed decimal money bindings and `UNCLASSIFIED` exception codes, `POST /api/sync/purchase-orders`, read-only `GET /api/orders`, read-only order-only `GET /api/kpis`, read-only `GET /api/analytics/cycle-time`, read-only order-only `GET /api/analytics/otif-risk`, read-only `GET /api/worklists/unclassified`, F1 read-index migration, disabled-by-default Graph notification scaffolding with a dry-run preview endpoint, and drift/unit/SQL integration tests against `src/warehouseAdapter.js`, `src/importRules.js`, the sync ownership boundary, the F1a order-list API, the F1b KPI API, F2 order-alert query/routing, F3 order-age bottleneck analytics, the F4 OTIF early-warning proxy, and the F5 sync-exception worklist API. It is not yet connected to a real warehouse feed or the browser.
 - Firestore security rule templates exist under `docs/FIRESTORE_RULES`. The authenticated template has been tightened to mirror the main app permission matrix and local regression checks guard the highest-risk assumptions, but the rules have not been deployed or validated against a production Firebase project in this repository.
 - Production package generation exists through `tools/package.py` and the two approved zip outputs, but production hosting, Firebase project separation, API-key restriction, and authentication deployment remain IT tasks.
-- Visual smoke testing is limited by local Firebase/auth/network behaviour in the desktop browser environment. The built demo was opened through localhost and the initial login shell rendered with 62 inlined modules and no console warnings/errors; authenticated dashboard/role/entity walkthroughs should still be repeated before demo using an approved seeded profile or tester login.
+- Visual smoke testing is limited by local Firebase/auth/network behaviour in the desktop browser environment. The built demo was opened through localhost in an earlier handover pass and the initial login shell rendered with the then-current module set and no console warnings/errors; authenticated dashboard/role/entity walkthroughs should still be repeated before demo using an approved seeded profile or tester login.
 - Access grid documentation exists, but the role matrix is broad and should be re-tested after every access-sensitive change.
 - Edena import/export support exists in the code path, but it needs business pilot validation with real Edena export samples before it should be considered production-proven.
 
@@ -172,7 +173,7 @@ Authentication and access:
 - Graph notification delivery is scaffolded but disabled by default. It requires IT-provided Graph app registration, Azure app settings/Key Vault secrets, and a recipient map. It does not yet persist sent-state or suppress repeated digest items between timer runs.
 - Backend cycle-time analytics are order-only. True workflow time-in-stage, stage-transition bottlenecks, and officer stage-SLA analytics require migration of browser `status_log` / workflow transition history into SQL.
 - Backend OTIF early warning is an order-only proxy. Supplier historical delay, supplier promise revision counts, shipment stage, GRN outcome, and true OTIF prediction require additional datasets or approved browser-side `PXProcFollowup` work.
-- Backend unclassified/unmapped worklist support is read-only. The browser admin screen and one-click add-rule/map-supplier/resolve-currency actions require approved browser-side work and final write-design decisions.
+- Backend unclassified/unmapped worklist support is read-only. A browser-side Exception Workbench now surfaces Firestore import/classification/supplier-mapping exceptions and links to existing remediation screens, but one-click backend add-rule/map-supplier/resolve-currency actions still require final write-design decisions.
 - Large generated single HTML is expected. Do not edit it by hand.
 - Some older docs may describe prototype history; the new continuity docs should be treated as the primary handover map.
 
@@ -192,9 +193,10 @@ Last local validation during this handover pass:
 - Data dictionary regenerated and checked: passed.
 - Structural invariants: passed.
 - Pre-test data-integrity invariants and approved package-zip hygiene checks: passed.
-- Local role/security/import/Data Quality/My Work regression checks: passed.
-- Localhost browser smoke of the built demo login shell: passed; full authenticated dashboard walkthrough was not performed from this session to avoid creating/submitting a new Firebase demo profile.
-- JavaScript syntax check for all 62 modules: passed.
+- Local role/security/import/Data Quality/My Work regression checks plus Daily Control Room/Supplier Chase/Exception Workbench structural checks: passed.
+- Localhost browser shell smoke of the modular source: passed for the new navigation entries and view containers with no console errors; full authenticated dashboard walkthrough was not performed from this session to avoid creating/submitting a new Firebase demo profile.
+- JavaScript syntax check for all 63 modules: passed.
+- Backend `pnpm test` with Docker SQL integration (`RUN_SQL_INTEGRATION=true`) passed: 48 pass, 0 skipped.
 - Demo build output generated: `dist/phoenix-procurement-DEMO.html`.
 - Isolated staged production build with `demoMode: false` and `authMode: 'password'`: passed.
 - Demo and production zip packages refreshed with these handover docs included:

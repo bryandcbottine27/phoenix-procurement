@@ -84,6 +84,8 @@ src/
                         reports.form.js     (backup dialog)
                         dqCockpit.js        (Increment 4 Data Quality Cockpit — PXDataQuality + linked Issue ownership)
                         scorecards.js       (Increment 5b Supplier Scorecards — PXScorecard + view)
+                        dailyControlRoom.js (Daily Control Room, Supplier Chase Plan,
+                                             Exception Workbench over existing control engines)
   operational.js        Documents / Follow-ups / Issues (shared detail sections)
   warehouseAdapter.js   PXWarehouse — future Data Warehouse/staging integration contract
   erpAdapter.js         PhoenixERP compatibility facade; delegates future sync to PXWarehouse
@@ -1002,7 +1004,9 @@ Regrouped the sidebar and reframed Documents. No data/schema change.
 **Workbench** (Dashboard · My Work), **Foreign Orders**, **Local Orders**, **Logistics Operations**
 (Shipments · Container Tracker), **Finance Control** (Forthcoming Payments · Payment Requests · Tax
 Provision Forecast — TEPS), **Records & Archives** (Closed Orders · Documents),
-**Reports & Controls** (Reports & Export · Suppliers · Data Quality · Supplier Scorecards), and
+**Reports & Controls** (Daily Control Room · Management Cockpit · Reports & Export · Suppliers ·
+Supplier Chase Plan · KPI Trends · OTIF Risk Forecast · Officer Workload · Operational Calendar ·
+Management Pack · Exceptions · Exception Workbench · Data Quality · Supplier Scorecards), and
 **System Settings** (Officers & Roles · ERP Reconciliation · ERP Import Rules · Working Calendars).
 The generic `.nav-item → navigate()` handler and CSS-driven responsive sidebar mean regrouped items
 work unchanged on mobile; existing functionality is untouched.
@@ -1709,8 +1713,13 @@ once after the historical import to populate the trend from real dates.
 `src/modules/reports/managementControls.js` adds read-only, entity-scoped control views over existing
 data. No new collection is created.
 
-- **Management Cockpit** (`mgmtcockpit`): daily control tower combining critical exceptions, high OTIF
+- **Daily Control Room** (`dailycontrol`): operating cadence view for daily control queues, weekly
+  supplier/payment/workload routines, and monthly management-pack review.
+- **Management Cockpit** (`mgmtcockpit`): control tower combining critical exceptions, high OTIF
   risks, clearance readiness risks, payment due/overdue exposure, and weak supplier reliability.
+- **Supplier Chase Plan** (`supplierchase`): supplier-grouped and order-level chase list covering
+  acknowledgement, promises, reply expectations, follow-up cadence, ready-without-shipment, and
+  delivery recovery.
 - **OTIF Risk Forecast** (`otifrisk`): predicts delivery risk before the requested receipt date using
   requested receipt, shipment creation, ETD/ETA, ETA changes, documents, and existing
   `PXProcFollowup.orderChecks`.
@@ -1726,7 +1735,12 @@ data. No new collection is created.
   ready dates, ETD/ETA, clearance dates, payment due dates, follow-up due dates, and update-request
   due dates.
 - **Management Pack** (`managementpack`): one-click CSV pack for weekly/monthly review, pulling the
-  major exception, risk, clearance, payment, partial-shipment, and supplier-reliability rows.
+  major exception, risk, clearance, payment, partial-shipment, and supplier-reliability rows, with
+  an executive summary and summary export rows.
+- **Exception Workbench** (`exceptionworkbench`): read-only remediation queue over classification,
+  supplier mapping, ERP/DW and import-history exceptions, linking to existing supplier mapping,
+  ERP reconciliation, import-rule, and order-detail screens. Backend SQL worklist write actions
+  remain separate future API work.
 
 The module exposes `window.PXManagementControls` builders so future screens/exports can reuse the same
 logic. Sidebar counters are provided by `__mgmtCockpitCount`, `__otifRiskCount`,

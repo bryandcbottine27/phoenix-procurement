@@ -70,6 +70,7 @@ MODULES = [
   'src/modules/reports/kpi.js',
   'src/modules/reports/kpiTrends.js',
   'src/modules/reports/managementControls.js',
+  'src/modules/reports/dailyControlRoom.js',
   'src/operational.js','src/warehouseAdapter.js','src/erpAdapter.js',
   'src/bcStructure.js',
   'src/teamWork.js',

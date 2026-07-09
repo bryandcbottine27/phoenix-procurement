@@ -239,6 +239,11 @@
     <div class="nav-section">
       <div class="nav-section-title">Reports &amp; Controls</div>
       <div class="nav-control-group">Management</div>
+      <div class="nav-item" data-view="dailycontrol">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18v16H3z"/><path d="M7 8h10"/><path d="M7 12h5"/><path d="M7 16h8"/></svg>
+        <span>Daily Control Room</span>
+        <span class="count" id="count-dailycontrol">—</span>
+      </div>
       <div class="nav-item" data-view="mgmtcockpit">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-5"/><path d="M12 16V8"/><path d="M16 16v-3"/><path d="M20 16V6"/></svg>
         <span>Management Cockpit</span>
@@ -250,10 +255,20 @@
       </div>
 
       <div class="nav-control-group">Operational Controls</div>
+      <div class="nav-item" data-view="supplierchase">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 8h10"/><path d="M7 12h6"/><path d="M7 16h8"/><path d="M5 3h14a2 2 0 012 2v14l-4-3H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
+        <span>Supplier Chase Plan</span>
+        <span class="count" id="count-supplierchase">—</span>
+      </div>
       <div class="nav-item" data-view="exceptions">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
         <span>Exceptions</span>
         <span class="count" id="count-exceptions">—</span>
+      </div>
+      <div class="nav-item" data-view="exceptionworkbench">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v5H4z"/><path d="M4 15h16v5H4z"/><path d="M8 9v6"/><path d="M16 9v6"/></svg>
+        <span>Exception Workbench</span>
+        <span class="count" id="count-exceptionworkbench">—</span>
       </div>
       <div class="nav-item" data-view="dqcockpit">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/><path d="M8 12h1"/><path d="M15 12h1"/><path d="M12 7v1"/></svg>
@@ -407,7 +422,9 @@
     <!-- ===== 7. MANAGEMENT REPORTING AND CONTROLS ===== -->
     <section class="view" id="view-reports"></section>
     <section class="view" id="view-suppliers"></section>
+    <section class="view" id="view-dailycontrol"></section>
     <section class="view" id="view-mgmtcockpit"></section>
+    <section class="view" id="view-supplierchase"></section>
     <section class="view" id="view-otifrisk"></section>
     <section class="view" id="view-workload"></section>
     <section class="view" id="view-opcalendar"></section>
@@ -415,6 +432,7 @@
     <section class="view" id="view-dqcockpit"></section>
     <section class="view" id="view-scorecards"></section>
     <section class="view" id="view-exceptions"></section>
+    <section class="view" id="view-exceptionworkbench"></section>
     <section class="view" id="view-kpitrends"></section>
 
     <!-- ===== 8. SYSTEM SETUP AND ERP ADMINISTRATION ===== -->
@@ -512,6 +530,7 @@
   <script type="module" src="src/modules/reports/kpi.js"></script>
   <script type="module" src="src/modules/reports/kpiTrends.js"></script>
   <script type="module" src="src/modules/reports/managementControls.js"></script>
+  <script type="module" src="src/modules/reports/dailyControlRoom.js"></script>
   <script type="module" src="src/operational.js"></script>
   <script type="module" src="src/warehouseAdapter.js"></script>
   <script type="module" src="src/erpAdapter.js"></script>

@@ -824,6 +824,46 @@ myWorkWindow = createMyWorkSandbox({
 myWork = myWorkWindow.__myWorkCompute({ renderDom: false, entityOverride: 'Phoenix' });
 check('My Work hides processed follow-up', myWork && myWork.actionCount === 0);
 
+const indexSource = read('index.html');
+const buildSource = read('build.py');
+const coreSource = read('src/core.js');
+const managementControlsSource = read('src/modules/reports/managementControls.js');
+const dailyControlSource = read('src/modules/reports/dailyControlRoom.js');
+const dailyViews = ['dailycontrol', 'supplierchase', 'exceptionworkbench'];
+
+check('Daily control module loads after management controls',
+  buildSource.indexOf("'src/modules/reports/managementControls.js'") >= 0
+  && buildSource.indexOf("'src/modules/reports/dailyControlRoom.js'") > buildSource.indexOf("'src/modules/reports/managementControls.js'"));
+
+check('Daily control source is loaded by index.html',
+  indexSource.includes('src/modules/reports/dailyControlRoom.js'));
+
+dailyViews.forEach(view => {
+  check(`Operational cadence view ${view} has nav, section, renderer and breadcrumb`,
+    indexSource.includes(`data-view="${view}"`)
+    && indexSource.includes(`id="view-${view}"`)
+    && dailyControlSource.includes(`__renderers['${view}']`)
+    && coreSource.includes(`'${view}':`));
+});
+
+check('Daily control views re-render on live control data changes',
+  /CONTROL_SUMMARY_VIEWS\s*=\s*\[[^\]]*'dailycontrol'[^\]]*'supplierchase'[^\]]*'exceptionworkbench'/s.test(coreSource));
+
+check('Daily control sidebar counts are wired',
+  coreSource.includes('__dailyControlCount')
+  && coreSource.includes('__supplierChaseCount')
+  && coreSource.includes('__exceptionWorkbenchCount'));
+
+check('Exception workbench reuses supplier mapping and import history signals',
+  dailyControlSource.includes('PXSupplierMap')
+  && dailyControlSource.includes('state.data.importRuns')
+  && dailyControlSource.includes('__openSupplierMappingWorklist'));
+
+check('Management pack exposes executive summary export helpers',
+  managementControlsSource.includes('function managementPackSummary')
+  && managementControlsSource.includes('function managementPackExportRows')
+  && managementControlsSource.includes('managementPackSummary, managementPackExportRows'));
+
 console.log();
 if (failures.length) {
   console.error(`REGRESSION CHECK FAILED (${failures.length} issue(s)):`);

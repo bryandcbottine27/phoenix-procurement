@@ -589,24 +589,91 @@ const REF = window.REF;
     return rows;
   }
 
+  function managementPackSummary(ent) {
+    const data = buildManagementData(ent);
+    const rows = managementPackRows(ent);
+    const criticalExceptions = data.exceptions.filter(x => x.check.level === 'danger').length;
+    const highOtif = data.otifRisk.filter(r => r.score >= 75).length;
+    const clearanceRisk = data.clearance.filter(r => r.score >= 45).length;
+    const paymentDue = data.payments.rows.filter(r => (r.daysUntil ?? daysUntil(r.forecastDate || r.dueDate)) <= 7).length;
+    const paymentOverdue = data.payments.rows.filter(r => (r.daysUntil ?? daysUntil(r.forecastDate || r.dueDate)) < 0).length;
+    const partialControls = data.partials.length;
+    const weakSuppliers = data.scorecards.filter(s => s.rating < 60).length;
+    const officerPressure = data.workload.filter(r => r.critical || r.dueSoon || r.total >= 8).length;
+    const focusAreas = [];
+    if (criticalExceptions) focusAreas.push('exceptions');
+    if (highOtif) focusAreas.push('OTIF risk');
+    if (clearanceRisk) focusAreas.push('clearance');
+    if (paymentOverdue || paymentDue) focusAreas.push('payments');
+    if (partialControls) focusAreas.push('partial shipments');
+    if (weakSuppliers) focusAreas.push('supplier reliability');
+    if (officerPressure) focusAreas.push('officer workload');
+    return {
+      entity: ent,
+      generatedAt: new Date().toISOString(),
+      packLines: rows.length,
+      sectionCount: new Set(rows.map(r => r.Section)).size,
+      criticalExceptions,
+      highOtif,
+      clearanceRisk,
+      paymentDue,
+      paymentOverdue,
+      partialControls,
+      weakSuppliers,
+      officerPressure,
+      focusAreas,
+      narrative: focusAreas.length
+        ? `Management focus: ${focusAreas.join(', ')}.`
+        : 'No major management exceptions are currently open for this entity.'
+    };
+  }
+
+  function managementPackExportRows(ent) {
+    const summary = managementPackSummary(ent);
+    return [
+      { Section: 'Executive Summary', Priority: 'Summary', Record: summary.entity, Supplier: '', Owner: '', Date: fmtDate(new Date()), Amount: '', Detail: summary.narrative },
+      { Section: 'Executive Summary', Priority: 'Critical exceptions', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.criticalExceptions) },
+      { Section: 'Executive Summary', Priority: 'High OTIF risk', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.highOtif) },
+      { Section: 'Executive Summary', Priority: 'Clearance risk', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.clearanceRisk) },
+      { Section: 'Executive Summary', Priority: 'Payment due <=7d', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.paymentDue) },
+      { Section: 'Executive Summary', Priority: 'Officer pressure', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.officerPressure) },
+      ...managementPackRows(ent)
+    ];
+  }
+
   function renderManagementPack() {
     const viewEl = $('#view-managementpack');
     if (!viewEl) return;
     const ent = currentEntity();
     const rows = managementPackRows(ent);
+    const summary = managementPackSummary(ent);
     viewEl.innerHTML = `${pageHead('Monthly Management Pack', 'One-click control extract for weekly or monthly procurement/logistics review.', `<button class="btn btn-primary" id="pack-export">Export Pack CSV</button>`)}
       <div class="kpi-pill-row">
         <div class="kpi-pill"><div class="kpi-pill-label">Pack lines</div><div class="kpi-pill-value">${rows.length}</div></div>
         <div class="kpi-pill"><div class="kpi-pill-label">Sections</div><div class="kpi-pill-value">${new Set(rows.map(r => r.Section)).size}</div></div>
+        <div class="kpi-pill"><div class="kpi-pill-label">Critical exceptions</div><div class="kpi-pill-value">${summary.criticalExceptions}</div></div>
+        <div class="kpi-pill"><div class="kpi-pill-label">High OTIF risk</div><div class="kpi-pill-value">${summary.highOtif}</div></div>
+        <div class="kpi-pill"><div class="kpi-pill-label">Payments due</div><div class="kpi-pill-value">${summary.paymentDue}</div></div>
+      </div>
+      <div class="mgmt-band">
+        <div class="mgmt-band-head"><div><h3>Executive summary</h3><span>Auto-generated operating focus for the current weekly/monthly pack.</span></div></div>
+        <div class="info-banner">${escapeHtml(summary.narrative)}</div>
+        ${miniTable(['Signal','Count'], [
+          `<tr><td>Critical exceptions</td><td class="num">${summary.criticalExceptions}</td></tr>`,
+          `<tr><td>High OTIF risk</td><td class="num">${summary.highOtif}</td></tr>`,
+          `<tr><td>Clearance risk</td><td class="num">${summary.clearanceRisk}</td></tr>`,
+          `<tr><td>Payment due <= 7d</td><td class="num">${summary.paymentDue}</td></tr>`,
+          `<tr><td>Officer pressure</td><td class="num">${summary.officerPressure}</td></tr>`
+        ], 'No summary signals.')}
       </div>
       ${miniTable(['Section','Priority','Record','Supplier','Owner','Date','Amount','Detail'], rows.slice(0, 120).map(r => `<tr><td>${escapeHtml(r.Section)}</td><td>${escapeHtml(r.Priority)}</td><td class="mono">${escapeHtml(r.Record)}</td><td>${escapeHtml(r.Supplier)}</td><td>${escapeHtml(r.Owner)}</td><td>${escapeHtml(r.Date)}</td><td>${escapeHtml(r.Amount)}</td><td>${escapeHtml(r.Detail)}</td></tr>`), 'No management-pack exceptions for this entity.')}`;
-    $('#pack-export')?.addEventListener('click', () => exportRows(rows, 'management-pack-' + ent));
+    $('#pack-export')?.addEventListener('click', () => exportRows(managementPackExportRows(ent), 'management-pack-' + ent));
   }
 
   window.PXManagementControls = {
     buildExceptions, buildOtifRisk, buildOfficerWorkload, buildPartialShipments,
     buildClearanceRows, buildPaymentExposure, buildCalendar, buildManagementData,
-    managementPackRows
+    managementPackRows, managementPackSummary, managementPackExportRows
   };
   window.__renderers['mgmtcockpit'] = renderManagementCockpit;
   window.__renderers['otifrisk'] = renderOtifRisk;

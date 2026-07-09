@@ -116,6 +116,8 @@ modules/
              erpImport.js — LIVE no-library XLSX reader + LIVE PO import engine
                             (PXXlsxReader, PXPoImport: grouped/validated/safe upsert),
                             legacy STATUS-log migration, and the demo-only data purge
+             dailyControlRoom.js — Daily Control Room, Supplier Chase Plan, and
+                            Exception Workbench over existing control engines
 operational.js       Documents / Follow-ups / Issues (shared detail sections) + demo file upload
 warehouseAdapter.js  PXWarehouse — future Data Warehouse/staging integration contract
 erpAdapter.js        PhoenixERP compatibility facade; delegates future sync to PXWarehouse
@@ -185,11 +187,12 @@ The sidebar groups (defined in `index.html`) and the breadcrumb hierarchy (`navS
 5. Finance Control        Forthcoming Payments · Payment Requests ·    (forecast · payments ·
                            Payment Exposure · Tax Provision Forecast      paymentexposure · taxprovision)
 6. Records & Archives     Closed Orders · Documents                    (closedorders · documents)
-7. Reports & Controls     Management Cockpit · Reports & Export ·       (mgmtcockpit · reports ·
-                           Suppliers · KPI Trends · OTIF Risk Forecast ·  suppliers · kpitrends ·
-                           Officer Workload · Operational Calendar ·      otifrisk · workload ·
-                           Management Pack · Exceptions · Data Quality ·  opcalendar · managementpack ·
-                           Supplier Scorecards                            exceptions · dqcockpit · scorecards)
+7. Reports & Controls     Daily Control Room · Management Cockpit ·      (dailycontrol · mgmtcockpit ·
+                           Reports & Export · Suppliers · Supplier        reports · suppliers · supplierchase ·
+                           Chase Plan · KPI Trends · OTIF Risk Forecast · kpitrends · otifrisk ·
+                           Officer Workload · Operational Calendar ·      workload · opcalendar ·
+                           Management Pack · Exceptions · Exception       managementpack · exceptions ·
+                           Workbench · Data Quality · Supplier Scorecards exceptionworkbench · dqcockpit · scorecards)
 8. System Settings        Officers & Roles · ERP Reconciliation ·       (officers · erprecon ·
                            ERP Import Rules · Working Calendars            erpimportrules · workingcalendars)
 ```
