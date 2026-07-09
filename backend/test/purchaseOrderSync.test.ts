@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
-import { SqlQueryExecutor, SqlParams } from "../src/sql/client";
+import { SqlQueryExecutor, SqlParams, TypedSqlParam } from "../src/sql/client";
 import {
+  ERP_STATUS_MAP,
   groupPurchaseOrders,
   mapErpPoStatus,
   syncPurchaseOrders
@@ -76,6 +79,22 @@ function findCall(calls: QueryCall[], pattern: RegExp): QueryCall {
   return call;
 }
 
+function repoRoot(): string {
+  return path.resolve(__dirname, "../../..");
+}
+
+function typed(value: unknown): TypedSqlParam {
+  assert.ok(value && typeof value === "object" && "type" in value && "value" in value, "expected typed SQL param");
+  return value as TypedSqlParam;
+}
+
+async function browserErpPoStatusMap(): Promise<Record<string, string>> {
+  const source = await readFile(path.join(repoRoot(), "src", "core.js"), "utf8");
+  const match = /erpStatusMap:\s*\{[\s\S]*?po:\s*\{([\s\S]*?)\}\s*,\s*receipt:/.exec(source);
+  assert.ok(match, "src/core.js must expose REF.erpStatusMap.po");
+  return Object.fromEntries(Array.from(match[1].matchAll(/'([^']+)'\s*:\s*'([^']+)'/g), item => [item[1], item[2]]));
+}
+
 test("groupPurchaseOrders groups duplicate entity/order rows and sums amounts", () => {
   const grouped = groupPurchaseOrders([
     order({ amount: 25, erpAmount: 25, lines: [{ lineNo: 10000, amount: 25 }] }),
@@ -94,7 +113,13 @@ test("mapErpPoStatus mirrors browser ERP status seed mapping", () => {
   assert.equal(mapErpPoStatus("Released"), "Order sent to supplier");
   assert.equal(mapErpPoStatus("Closed"), "Order closed");
   assert.equal(mapErpPoStatus("Cancelled"), "Order cancelled");
+  assert.equal(mapErpPoStatus("released"), "Order sent to supplier");
+  assert.equal(mapErpPoStatus("closed"), "Order closed");
   assert.equal(mapErpPoStatus("Unexpected"), "Order sent to supplier");
+});
+
+test("backend ERP PO status map stays in lockstep with browser REF.erpStatusMap.po", async () => {
+  assert.deepEqual(ERP_STATUS_MAP, await browserErpPoStatusMap());
 });
 
 test("syncPurchaseOrders updates ERP-owned fields without Phoenix-owned ownership fields", async () => {
@@ -128,6 +153,8 @@ test("syncPurchaseOrders updates ERP-owned fields without Phoenix-owned ownershi
   assert.equal(update.params.phoenix_data, undefined);
   assert.equal(update.params.warehouse_batch_id, "BATCH-OWNERSHIP");
   assert.equal(update.params.erp_sync_status, "synced");
+  assert.equal(typed(update.params.amount).value, 100);
+  assert.equal(typed(update.params.erp_amount).value, 100);
   assert.equal((update.params.last_refresh_at as Date).toISOString(), "2026-07-09T09:00:00.000Z");
   assert.match(String(update.params.last_refresh_changes_json), /PO Amount/);
 });
@@ -151,6 +178,24 @@ test("syncPurchaseOrders inserts new rows with seeded Phoenix status only on cre
   assert.doesNotMatch(insert.sqlText, /\bphoenix_data\b/i);
   assert.equal(insert.params.status, "Order sent to supplier");
   assert.equal(insert.params.is_closed, false);
+  assert.equal(typed(insert.params.amount).value, 100);
+  assert.equal(typed(insert.params.erp_amount).value, 100);
+});
+
+test("syncPurchaseOrders maps lowercase closed ERP status and marks new order closed", async () => {
+  const { query, calls } = makeFakeQuery();
+
+  await syncPurchaseOrders({
+    orders: [order({ erpPoStatus: "closed" })],
+    query,
+    batchId: "BATCH-CLOSED",
+    now: "2026-07-09T09:45:00.000Z",
+    trigger: "unit"
+  });
+
+  const insert = findCall(calls, /INSERT INTO dbo\.orders/i);
+  assert.equal(insert.params.status, "Order closed");
+  assert.equal(insert.params.is_closed, true);
 });
 
 test("syncPurchaseOrders writes malformed rows to sync_exceptions", async () => {
@@ -172,6 +217,23 @@ test("syncPurchaseOrders writes malformed rows to sync_exceptions", async () => 
   assert.match(String(exception.params.error_message), /missing PO number/);
   assert.match(String(exception.params.error_message), /missing currency/);
   assert.equal(calls.some(call => /INSERT INTO dbo\.orders/i.test(call.sqlText)), false);
+});
+
+test("syncPurchaseOrders tags unresolved classification as UNCLASSIFIED", async () => {
+  const { query, calls } = makeFakeQuery();
+
+  const result = await syncPurchaseOrders({
+    orders: [order({ function: null })],
+    query,
+    batchId: "BATCH-UNCLASSIFIED",
+    now: "2026-07-09T10:30:00.000Z",
+    trigger: "unit"
+  });
+
+  assert.equal(result.exceptionCount, 1);
+  const exception = findCall(calls, /INSERT INTO dbo\.sync_exceptions/i);
+  assert.equal(exception.params.error_code, "UNCLASSIFIED");
+  assert.match(String(exception.params.error_message), /unclassified function/);
 });
 
 test("syncPurchaseOrders keeps warehouse values in parameters, not SQL text", async () => {

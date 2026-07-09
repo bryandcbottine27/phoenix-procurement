@@ -119,6 +119,10 @@ upsert statements must use parameterized `mssql` requests for external values;
 no fixture, warehouse, or user-provided value may be interpolated into SQL text.
 `test/purchaseOrderSync.test.ts` covers grouping, status seeding, exception
 queueing, ownership preservation on updates, and parameterized SQL structure.
+Gate 3b.1 tightened that path with typed decimal money bindings,
+case-insensitive ERP PO status mapping guarded against the browser map,
+`UNCLASSIFIED` sync exception codes, and failed-audit logging for fatal sync
+errors.
 
 Gate 4 will add integration tests against local SQL and document the real Data
 Warehouse swap point.

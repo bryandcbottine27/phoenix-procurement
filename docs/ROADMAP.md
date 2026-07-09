@@ -198,8 +198,9 @@ Scope:
 - Cleanup pass adds durable backend handoff documentation, formal full-snapshot packaging, zip-content invariants, scratchpad removal, a parameterized SQL helper, and local-dev SQL certificate guidance.
 - Gate 3a adds backend `function` and `orderType` classification, including a drift guard against `src/importRules.js` and canonical Phoenix/Seychelles/Edena unit tests.
 - Gate 3b adds ownership-safe transactional SQL upsert, `sync_exceptions` queueing, per-batch `import_audit`, HTTP sync trigger, disabled timer stub, and unit tests for grouping/ownership/parameterization.
+- Gate 3b.1 tightens the sync path with typed decimal money bindings, case-insensitive ERP PO status mapping drift-guarded against `src/core.js`, `UNCLASSIFIED` exception codes, and failed-audit logging.
 - F1a adds read-only `GET /api/orders` with typed parameterized filters, allowlisted sorting, pagination, function-key auth, and SQL integration-ready tests.
-- Next backend gates: F1b order-only KPI aggregations with honest coverage metadata, then F1c endpoint README/Power BI notes and optional read indexes.
+- Next backend gate: Gate 4 SQL integration tests and full backend README completion before F1b/F1c.
 - Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
 Acceptance criteria:

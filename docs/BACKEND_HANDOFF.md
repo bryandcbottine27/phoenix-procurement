@@ -160,6 +160,16 @@ Implementation status:
 - Gate 4 remains responsible for SQL-backed integration tests against LocalDB or
   Docker SQL Server.
 
+3b.1 corrective status:
+
+- Money fields `amount` and `erp_amount` bind as `sql.Decimal(18,4)`.
+- ERP PO status mapping is case-insensitive and drift-guarded against
+  `src/core.js` `REF.erpStatusMap.po`.
+- Unresolved classification rows write `sync_exceptions.error_code =
+  'UNCLASSIFIED'`.
+- Fatal sync failures best-effort write a failed `import_audit` row outside the
+  transaction.
+
 Requirements:
 
 - Use only the parameterized helper from cleanup C3 for external values.

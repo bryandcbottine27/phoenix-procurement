@@ -1,5 +1,6 @@
 import { dwSource } from "../sources/dwSource";
-import { SqlQueryExecutor, withTransaction } from "../sql/client";
+import * as sql from "mssql";
+import { queryParams, SqlQueryExecutor, typedParam, withTransaction } from "../sql/client";
 import { OrderContractField, PurchaseOrderContract } from "../warehouse/contract";
 
 type OrderRecord = Record<string, unknown>;
@@ -54,7 +55,7 @@ const ERP_COLUMNS: FieldColumn[] = [
   { field: "orderType", column: "order_type", param: "order_type" },
   { field: "function", column: "procurement_function", param: "procurement_function" },
   { field: "currency", column: "currency", param: "currency" },
-  { field: "amount", column: "amount", param: "amount" },
+  { field: "amount", column: "amount", param: "amount", value: order => money(order.amount) },
   { field: "dateOfOrder", column: "date_of_order", param: "date_of_order" },
   { field: "description", column: "description", param: "description" },
   { field: "paymentTerms", column: "payment_terms", param: "payment_terms" },
@@ -64,7 +65,7 @@ const ERP_COLUMNS: FieldColumn[] = [
   { field: "claimant", column: "claimant", param: "claimant" },
   { field: "requestedReceiptDate", column: "requested_receipt_date", param: "requested_receipt_date" },
   { field: "erpPoStatus", column: "erp_po_status", param: "erp_po_status" },
-  { field: "erpAmount", column: "erp_amount", param: "erp_amount" },
+  { field: "erpAmount", column: "erp_amount", param: "erp_amount", value: order => money(order.erpAmount) },
   { field: "erpCurrency", column: "erp_currency", param: "erp_currency" },
   { field: "erpHodId", column: "erp_hod_id", param: "erp_hod_id" },
   { field: "erpPurchasingMgrId", column: "erp_purchasing_mgr_id", param: "erp_purchasing_mgr_id" },
@@ -87,7 +88,7 @@ const ERP_COLUMNS: FieldColumn[] = [
   { field: "warehouseHash", column: "warehouse_hash", param: "warehouse_hash" }
 ];
 
-const ERP_STATUS_MAP: Record<string, string> = {
+export const ERP_STATUS_MAP: Record<string, string> = {
   "Pending Approval": "Order amendment pending",
   Open: "Order sent to supplier",
   Released: "Order sent to supplier",
@@ -109,6 +110,10 @@ function numberOrNull(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function money(value: unknown): ReturnType<typeof typedParam> {
+  return typedParam(sql.Decimal(18, 4), numberOrNull(value));
 }
 
 function iso(value: string | Date | undefined): string {
@@ -166,7 +171,15 @@ function refreshChanges(existing: ExistingOrderRow, order: PurchaseOrderContract
 
 export function mapErpPoStatus(erpPoStatus: unknown): string {
   const status = text(erpPoStatus);
-  return status && ERP_STATUS_MAP[status] ? ERP_STATUS_MAP[status] : "Order sent to supplier";
+  if (!status) return "Order sent to supplier";
+  if (ERP_STATUS_MAP[status]) return ERP_STATUS_MAP[status];
+  const key = Object.keys(ERP_STATUS_MAP).find(item => item.toLowerCase() === status.toLowerCase());
+  return key ? ERP_STATUS_MAP[key] : "Order sent to supplier";
+}
+
+function isClosedErpPoStatus(erpPoStatus: unknown): boolean {
+  const mapped = mapErpPoStatus(erpPoStatus);
+  return mapped === "Order closed" || mapped === "Order cancelled";
 }
 
 export function validatePurchaseOrder(order: PurchaseOrderContract): string[] {
@@ -267,6 +280,7 @@ async function finishImportAudit(query: SqlQueryExecutor, result: PurchaseOrderS
 }
 
 async function writeSyncException(query: SqlQueryExecutor, batchId: string, order: PurchaseOrderContract, errors: string[]): Promise<void> {
+  const errorCode = errors.some(error => /unclassified/i.test(error)) ? "UNCLASSIFIED" : "VALIDATION_FAILED";
   await query(`
     INSERT INTO dbo.sync_exceptions (
       batch_id, entity, order_id, warehouse_record_id, error_code, error_message, payload_json
@@ -279,7 +293,7 @@ async function writeSyncException(query: SqlQueryExecutor, batchId: string, orde
     entity: text(order.entity),
     order_id: text(order.orderId),
     warehouse_record_id: text(order.warehouseRecordId),
-    error_code: "VALIDATION_FAILED",
+    error_code: errorCode,
     error_message: errors.join("; "),
     payload_json: JSON.stringify(order)
   });
@@ -321,7 +335,7 @@ async function updateExistingOrder(query: SqlQueryExecutor, existing: ExistingOr
 
 async function insertNewOrder(query: SqlQueryExecutor, order: PurchaseOrderContract, now: string): Promise<void> {
   const status = mapErpPoStatus(order.erpPoStatus);
-  const isClosed = order.erpPoStatus === "Closed" || status === "Order closed" || status === "Order cancelled";
+  const isClosed = isClosedErpPoStatus(order.erpPoStatus);
   const columns = ["entity", "order_id", ...ERP_COLUMNS.map(field => field.column), "erp_sync_status", "erp_last_synced_at", "status", "is_closed"];
   const params = ["@entity", "@order_id", ...ERP_COLUMNS.map(field => `@${field.param}`), "@erp_sync_status", "@erp_last_synced_at", "@status", "@is_closed"];
 
@@ -336,6 +350,26 @@ async function insertNewOrder(query: SqlQueryExecutor, order: PurchaseOrderContr
     erp_last_synced_at: dateTime(now),
     status,
     is_closed: isClosed
+  });
+}
+
+async function writeFailedImportAudit(batchId: string, fetchedCount: number, trigger: string, error: unknown): Promise<void> {
+  const message = error instanceof Error ? error.message : String(error);
+  await queryParams(`
+    INSERT INTO dbo.import_audit (
+      batch_id, warehouse_source, finished_at, status, fetched_count, normalized_count,
+      created_count, updated_count, exception_count, details_json
+    )
+    VALUES (
+      @batch_id, @warehouse_source, SYSUTCDATETIME(), @status, @fetched_count, 0,
+      0, 0, 1, @details_json
+    );
+  `, {
+    batch_id: batchId,
+    warehouse_source: null,
+    status: "failed",
+    fetched_count: fetchedCount,
+    details_json: JSON.stringify({ trigger, error: message })
   });
 }
 
@@ -382,12 +416,23 @@ async function syncWithQuery(
 }
 
 export async function syncPurchaseOrders(options: PurchaseOrderSyncOptions = {}): Promise<PurchaseOrderSyncResult> {
-  const orders = options.orders || await (options.fetchPurchaseOrders || dwSource.fetchPurchaseOrders)();
   const now = iso(options.now);
   const batchId = text(options.batchId) || `WD-${Date.now()}`;
   const trigger = text(options.trigger) || "manual";
-  const warehouseSource = text(options.warehouseSource) || text(orders[0]?.warehouseSource);
-
-  const run = (query: SqlQueryExecutor) => syncWithQuery(query, orders, { batchId, now, trigger, warehouseSource });
-  return options.query ? run(options.query) : withTransaction(run);
+  let orders: PurchaseOrderContract[] = [];
+  try {
+    orders = options.orders || await (options.fetchPurchaseOrders || dwSource.fetchPurchaseOrders)();
+    const warehouseSource = text(options.warehouseSource) || text(orders[0]?.warehouseSource);
+    const run = (query: SqlQueryExecutor) => syncWithQuery(query, orders, { batchId, now, trigger, warehouseSource });
+    return options.query ? run(options.query) : withTransaction(run);
+  } catch (error) {
+    if (!options.query) {
+      try {
+        await writeFailedImportAudit(batchId, orders.length, trigger, error);
+      } catch {
+        // Preserve the original sync failure; failed-audit logging is best effort.
+      }
+    }
+    throw error;
+  }
 }
