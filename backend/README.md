@@ -238,6 +238,58 @@ dataset.
 aggregations: entity/date, function, order type, ERP PO status, requested
 receipt exposure, open sync exceptions, and latest import audit lookup.
 
+## Order Alert Notifications
+
+F2 adds order-level notification scaffolding for responsible officers. The timer
+is disabled by default and reads SQL only. It looks for:
+
+- open orders with `requested_receipt_date` already overdue;
+- open orders with `requested_receipt_date` approaching within
+  `ORDER_ALERTS_APPROACHING_DAYS`;
+- open orders with `erp_last_synced_at` missing or older than
+  `ORDER_ALERTS_STALE_SYNC_DAYS`.
+
+Preview the current digest without sending Graph messages:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/notifications/order-alerts/preview"
+```
+
+Timer settings:
+
+- `ORDER_ALERTS_ENABLED=false` keeps the timer inactive.
+- `ORDER_ALERTS_DRY_RUN=true` runs the query and builds digests without Graph
+  delivery.
+- `ORDER_ALERTS_CRON` overrides the default `0 0 4 * * *` schedule.
+- `ORDER_ALERT_RECIPIENT_MAP_JSON` maps officer keys to email targets. Keys are
+  checked in this order: `erp_purchaser_code`, `erp_created_by`, `claimant`,
+  `procurement_function`, `entity`, `default`.
+- `ORDER_ALERT_FALLBACK_EMAIL` is used when no map key matches.
+
+Example recipient map:
+
+```json
+{
+  "ET01": { "email": "technical.officer@example.com", "label": "Technical" },
+  "supplychain": "supply.chain@example.com",
+  "Phoenix": "phoenix.procurement@example.com",
+  "default": "procurement.control@example.com"
+}
+```
+
+Graph delivery settings must come from Azure app settings or Key Vault, never
+from committed files:
+
+- `GRAPH_TENANT_ID`
+- `GRAPH_CLIENT_ID`
+- `GRAPH_CLIENT_SECRET`
+- `GRAPH_MAIL_SENDER_USER_ID`
+- optional `GRAPH_TEAMS_TEAM_ID` and `GRAPH_TEAMS_CHANNEL_ID` for a Teams channel
+  summary.
+
+Until a notification/audit table is approved, F2 does not write sent-state to
+SQL and therefore does not suppress repeated digest items between timer runs.
+
 ## Docker SQL Server Example
 
 ```powershell
@@ -288,4 +340,6 @@ F1a added `GET /api/orders` as the first read-side endpoint for BI/future browse
 consumers. F1b added honest order-only KPI aggregations and coverage metadata in
 `GET /api/kpis`, with optional live SQL integration coverage. F1c added the
 endpoint contract, Power BI consumption note, read-index migration, and
-real-SQL/Data Warehouse swap points.
+real-SQL/Data Warehouse swap points. F2 added disabled-by-default Graph
+notification scaffolding plus a function-key preview endpoint for order-level
+requested-receipt and stale-sync alerts.

@@ -203,7 +203,8 @@ Scope:
 - F1a adds read-only `GET /api/orders` with typed parameterized filters, allowlisted sorting, pagination, function-key auth, and SQL integration-ready tests.
 - F1b adds read-only `GET /api/kpis` with order-only counts, multi-currency spend buckets, MTTO, ageing, requested-receipt proxy exposure, data-quality counts, latest sync metadata, explicit coverage exclusions, function-key auth, and SQL integration-ready tests.
 - F1c adds the read endpoint contract, Power BI Web connector notes, real SQL/Data Warehouse swap points, and idempotent read indexes in `backend/db/002_kpi_indexes.sql`.
-- Next backend delivery item: F2 Graph notifications for responsible-officer alerts.
+- F2 adds disabled-by-default Graph notification scaffolding for responsible-officer requested-receipt and stale-sync alerts, including a function-key dry-run preview endpoint, environment-only Graph settings, recipient-map routing, and SQL integration-ready tests.
+- Next backend delivery item: F3 cycle-time / bottleneck analytics.
 - Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
 Acceptance criteria:

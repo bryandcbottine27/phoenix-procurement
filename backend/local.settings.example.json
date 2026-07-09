@@ -3,6 +3,19 @@
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "SQL_CONNECTION_STRING": "Server=(localdb)\\MSSQLLocalDB;Database=PhoenixProcurementBackend;Trusted_Connection=True;TrustServerCertificate=True"
+    "SQL_CONNECTION_STRING": "Server=(localdb)\\MSSQLLocalDB;Database=PhoenixProcurementBackend;Trusted_Connection=True;TrustServerCertificate=True",
+    "ORDER_ALERTS_ENABLED": "false",
+    "ORDER_ALERTS_DRY_RUN": "true",
+    "ORDER_ALERTS_APPROACHING_DAYS": "7",
+    "ORDER_ALERTS_STALE_SYNC_DAYS": "3",
+    "ORDER_ALERT_RECIPIENT_MAP_JSON": "{}",
+    "ORDER_ALERT_FALLBACK_EMAIL": "",
+    "ORDER_ALERTS_CRON": "0 0 4 * * *",
+    "GRAPH_TENANT_ID": "",
+    "GRAPH_CLIENT_ID": "",
+    "GRAPH_CLIENT_SECRET": "",
+    "GRAPH_MAIL_SENDER_USER_ID": "",
+    "GRAPH_TEAMS_TEAM_ID": "",
+    "GRAPH_TEAMS_CHANNEL_ID": ""
   }
 }

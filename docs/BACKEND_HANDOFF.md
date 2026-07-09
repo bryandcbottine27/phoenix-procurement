@@ -291,8 +291,25 @@ F1c implementation status:
 
 Remaining backend delivery items:
 
-1. F2 - Graph notifications for approaching/overdue requested receipt and stale
-   orders.
-2. F3 - cycle-time / bottleneck analytics.
-3. F4 - OTIF early-warning.
-4. F5 - unclassified/unmapped worklist UI.
+F2 implementation status:
+
+- `backend/src/notifications/orderAlerts.ts` queries open SQL orders for
+  approaching/overdue requested receipt dates and stale ERP sync timestamps.
+- `backend/src/notifications/graphClient.ts` contains the Microsoft Graph
+  sendMail and optional Teams-channel adapter.
+- `backend/src/functions/orderAlertNotifications.ts` registers a
+  disabled-by-default timer plus `GET /api/notifications/order-alerts/preview`
+  for dry-run testing without Graph delivery.
+- Recipient routing is environment-driven through
+  `ORDER_ALERT_RECIPIENT_MAP_JSON` and `ORDER_ALERT_FALLBACK_EMAIL`; Graph
+  secrets must come from app settings or Key Vault.
+- F2 writes no SQL sent-state yet, so repeated digest suppression remains a
+  future design decision.
+- Covered by `backend/test/orderAlerts.test.ts` and optional live SQL coverage
+  in `backend/test/orderAlerts.integration.test.ts`.
+
+Remaining backend delivery items:
+
+1. F3 - cycle-time / bottleneck analytics.
+2. F4 - OTIF early-warning.
+3. F5 - unclassified/unmapped worklist UI.
