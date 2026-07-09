@@ -232,6 +232,28 @@ feed. Power BI should respect the `coverage.excluded` list and must not create
 OTIF, GRN cycle-time, or supplier-scorecard measures from this order-only SQL
 dataset.
 
+### `GET /api/analytics/cycle-time`
+
+Query parameters:
+
+- `entity`
+- `dateFrom` / `dateTo` (`YYYY-MM-DD`, scoped to `date_of_order`)
+- `longOpenDays` (default `90`)
+- `staleSyncDays` (default `3`)
+
+Example:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/analytics/cycle-time?entity=Phoenix&longOpenDays=90"
+```
+
+The endpoint returns order-age and requested-receipt bottleneck analytics grouped
+by officer, supplier, category, and function. It also returns SLA-style counts
+for overdue requested receipts, stale ERP sync, and long-open orders. Its
+`coverage` block explicitly excludes true workflow time-in-stage and
+stage-transition bottlenecks because SQL does not yet contain browser
+`status_log` / `workflows.js` transition history.
+
 ### Read Indexes
 
 `db/002_kpi_indexes.sql` adds idempotent read indexes for the F1 filters and
@@ -342,4 +364,6 @@ consumers. F1b added honest order-only KPI aggregations and coverage metadata in
 endpoint contract, Power BI consumption note, read-index migration, and
 real-SQL/Data Warehouse swap points. F2 added disabled-by-default Graph
 notification scaffolding plus a function-key preview endpoint for order-level
-requested-receipt and stale-sync alerts.
+requested-receipt and stale-sync alerts. F3 added
+`GET /api/analytics/cycle-time` for order-age bottleneck analytics with explicit
+coverage metadata for workflow time-in-stage gaps.

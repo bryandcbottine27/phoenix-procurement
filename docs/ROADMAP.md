@@ -204,7 +204,8 @@ Scope:
 - F1b adds read-only `GET /api/kpis` with order-only counts, multi-currency spend buckets, MTTO, ageing, requested-receipt proxy exposure, data-quality counts, latest sync metadata, explicit coverage exclusions, function-key auth, and SQL integration-ready tests.
 - F1c adds the read endpoint contract, Power BI Web connector notes, real SQL/Data Warehouse swap points, and idempotent read indexes in `backend/db/002_kpi_indexes.sql`.
 - F2 adds disabled-by-default Graph notification scaffolding for responsible-officer requested-receipt and stale-sync alerts, including a function-key dry-run preview endpoint, environment-only Graph settings, recipient-map routing, and SQL integration-ready tests.
-- Next backend delivery item: F3 cycle-time / bottleneck analytics.
+- F3 adds read-only `GET /api/analytics/cycle-time` for order-age, requested-receipt, stale-sync, and long-open bottleneck analytics grouped by officer/supplier/category/function, with explicit coverage limits for true workflow time-in-stage until status history is migrated to SQL.
+- Next delivery item: F4 OTIF early-warning, noting that the handoff describes browser-side work while the current ground rule says browser untouched unless explicitly approved.
 - Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
 Acceptance criteria:

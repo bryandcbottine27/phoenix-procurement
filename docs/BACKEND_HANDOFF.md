@@ -310,6 +310,22 @@ F2 implementation status:
 
 Remaining backend delivery items:
 
-1. F3 - cycle-time / bottleneck analytics.
-2. F4 - OTIF early-warning.
-3. F5 - unclassified/unmapped worklist UI.
+F3 implementation status:
+
+- `backend/src/analytics/cycleTime.ts` computes order-only cycle/bottleneck
+  metrics from SQL orders.
+- `backend/src/functions/cycleTimeAnalytics.ts` exposes
+  `GET /api/analytics/cycle-time` with function-key auth.
+- Metrics cover open order age, requested-receipt lead/delay, stale-sync and
+  long-open SLA-style breaches, grouped by officer, supplier, category, and
+  function.
+- The response explicitly excludes true workflow time-in-stage and stage
+  transition bottlenecks until browser `status_log` / workflow history is
+  migrated to SQL.
+- Covered by `backend/test/cycleTime.test.ts` and optional live SQL coverage in
+  `backend/test/cycleTime.integration.test.ts`.
+
+Remaining backend delivery items:
+
+1. F4 - OTIF early-warning.
+2. F5 - unclassified/unmapped worklist UI.
