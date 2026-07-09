@@ -123,6 +123,121 @@ OTIF, cycle time through GRN/shipment stages, supplier scorecards, and live
 Phoenix operational status because shipment, payment, GRN, and live Phoenix
 operational data are not in SQL yet.
 
+## Read API Contract
+
+Read endpoints use `authLevel: "function"` and should be served through the
+final private Azure/VNet path. Use a read-only SQL principal for these endpoints
+in production. They must not write to SQL.
+
+### `GET /api/orders`
+
+Query parameters:
+
+- `entity`
+- `function`
+- `orderType`
+- `erpPoStatus`
+- `closed` (`true` or `false`)
+- `supplier` (contains search)
+- `dateFrom` / `dateTo` (`YYYY-MM-DD`, scoped to `date_of_order`)
+- `page` (default `1`)
+- `pageSize` (default `50`, max `200`)
+- `sort` (`date_of_order`, `amount`, `entity`, `order_id`, or
+  `erp_po_status`, with `asc` or `desc`)
+
+Example:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/orders?entity=Phoenix&function=technical&page=1&pageSize=50&sort=date_of_order:desc"
+```
+
+Response shape:
+
+```json
+{
+  "data": [],
+  "page": 1,
+  "pageSize": 50,
+  "total": 0,
+  "generatedAt": "2026-07-09T00:00:00.000Z"
+}
+```
+
+Rows map SQL snake_case columns to the browser/backend camelCase contract.
+`phoenix_data` is not exposed. SQL `status` appears only as
+`initialOperationalStatus`, because it is seeded by the connector and is not
+the live Phoenix operational status.
+
+### `GET /api/kpis`
+
+Query parameters:
+
+- `entity`
+- `dateFrom` / `dateTo` (`YYYY-MM-DD`, scoped to `date_of_order`)
+
+Example:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/kpis?entity=Phoenix&dateFrom=2026-07-01&dateTo=2026-07-31"
+```
+
+Response shape:
+
+```json
+{
+  "scope": { "entity": "Phoenix", "dateFrom": "2026-07-01", "dateTo": "2026-07-31" },
+  "generatedAt": "2026-07-09T00:00:00.000Z",
+  "counts": {
+    "byEntity": [],
+    "byFunction": [],
+    "byOrderType": [],
+    "byErpPoStatus": [],
+    "openClosed": { "open": 0, "closed": 0 }
+  },
+  "spendCommitment": { "byCurrency": {} },
+  "mtto": { "avgDays": null, "medianDays": null, "sampleSize": 0 },
+  "ageing": { "openByBucket": { "0-30": 0, "31-60": 0, "61-90": 0, "90+": 0 } },
+  "requestedReceipt": {
+    "proxy": true,
+    "overdue": { "count": 0, "valueByCurrency": {} },
+    "approachingDays": 7,
+    "approaching": { "count": 0, "valueByCurrency": {} }
+  },
+  "dataQuality": {
+    "unclassifiedFunction": 0,
+    "unclassifiedOrderType": 0,
+    "openSyncExceptions": 0,
+    "staleSyncOverDays": 3,
+    "staleSyncCount": 0
+  },
+  "sync": { "lastBatchId": null, "lastLoadedAt": null, "created": 0, "updated": 0, "exceptions": 0 },
+  "coverage": {
+    "excluded": ["otif", "cycleTimeThroughGrn", "supplierScorecards", "liveOperationalStatus"],
+    "reason": "Shipment/payment/GRN and live Phoenix operational data are not in SQL yet (WD connector syncs ERP order data only)."
+  }
+}
+```
+
+Amounts are grouped by currency and are never summed across currencies.
+Lifecycle metrics use `erp_po_status` and `is_closed`, not the seeded SQL
+`status` column.
+
+### Power BI Consumption
+
+For a first BI connection, use Power BI Desktop's **Get Data > Web** connector
+against the private Function URL. Pass the function key as an `x-functions-key`
+header, or use the final APIM/private endpoint policy chosen by IT. Treat
+`GET /api/orders` as the detail table and `GET /api/kpis` as a shaped summary
+feed. Power BI should respect the `coverage.excluded` list and must not create
+OTIF, GRN cycle-time, or supplier-scorecard measures from this order-only SQL
+dataset.
+
+### Read Indexes
+
+`db/002_kpi_indexes.sql` adds idempotent read indexes for the F1 filters and
+aggregations: entity/date, function, order type, ERP PO status, requested
+receipt exposure, open sync exceptions, and latest import audit lookup.
+
 ## Docker SQL Server Example
 
 ```powershell
@@ -171,6 +286,6 @@ exceptions, decimal precision, lowercase status mapping, and line grouping.
 
 F1a added `GET /api/orders` as the first read-side endpoint for BI/future browser
 consumers. F1b added honest order-only KPI aggregations and coverage metadata in
-`GET /api/kpis`, with optional live SQL integration coverage. F1c will expand
-this README with the full endpoint contract, Power BI consumption note, optional
-read indexes, and real-SQL/Data Warehouse swap points.
+`GET /api/kpis`, with optional live SQL integration coverage. F1c added the
+endpoint contract, Power BI consumption note, read-index migration, and
+real-SQL/Data Warehouse swap points.

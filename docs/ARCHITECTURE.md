@@ -141,6 +141,9 @@ Backend v1 scaffold:
   - `orders`
   - `sync_exceptions`
   - `import_audit`
+- `backend/db/002_kpi_indexes.sql` adds idempotent read indexes for order
+  filters/KPIs, requested-receipt exposure, open sync exceptions, and latest
+  import-audit lookup.
 - SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
 - Phoenix-owned operational state is represented separately from ERP/provenance columns so the sync upsert can preserve it.
 - `backend/src/sources/dwSource.ts` reads fixture purchase orders, normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape, and applies backend classification.

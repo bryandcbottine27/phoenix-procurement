@@ -281,7 +281,18 @@ F1b implementation status:
 - Covered by `backend/test/kpisRead.test.ts` and optional live SQL coverage in
   `backend/test/kpisRead.integration.test.ts`.
 
-Remaining F1 gates:
+F1c implementation status:
 
-1. F1c - README endpoint contract, Power BI consumption note, real-SQL/Data
-   Warehouse swap points, and optional read indexes.
+- `backend/README.md` documents the read endpoint contracts, examples, function
+  key auth model, read-only SQL-principal expectation, Power BI Web connector
+  consumption note, and the real SQL / real Data Warehouse swap points.
+- `backend/db/002_kpi_indexes.sql` adds idempotent read indexes for F1 filters
+  and aggregations.
+
+Remaining backend delivery items:
+
+1. F2 - Graph notifications for approaching/overdue requested receipt and stale
+   orders.
+2. F3 - cycle-time / bottleneck analytics.
+3. F4 - OTIF early-warning.
+4. F5 - unclassified/unmapped worklist UI.

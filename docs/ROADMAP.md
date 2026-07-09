@@ -202,7 +202,8 @@ Scope:
 - Gate 4 adds SQL integration tests for create, idempotent re-run, ownership preservation, malformed/unclassified exceptions, decimal precision, lowercase status mapping, line grouping, plus README run-local and real SQL/Data Warehouse swap points.
 - F1a adds read-only `GET /api/orders` with typed parameterized filters, allowlisted sorting, pagination, function-key auth, and SQL integration-ready tests.
 - F1b adds read-only `GET /api/kpis` with order-only counts, multi-currency spend buckets, MTTO, ageing, requested-receipt proxy exposure, data-quality counts, latest sync metadata, explicit coverage exclusions, function-key auth, and SQL integration-ready tests.
-- Next backend gate: F1c endpoint README/Power BI notes and optional read indexes.
+- F1c adds the read endpoint contract, Power BI Web connector notes, real SQL/Data Warehouse swap points, and idempotent read indexes in `backend/db/002_kpi_indexes.sql`.
+- Next backend delivery item: F2 Graph notifications for responsible-officer alerts.
 - Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
 Acceptance criteria:
