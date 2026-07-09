@@ -327,5 +327,21 @@ F3 implementation status:
 
 Remaining backend delivery items:
 
-1. F4 - OTIF early-warning.
-2. F5 - unclassified/unmapped worklist UI.
+F4 implementation status:
+
+- `backend/src/analytics/otifRisk.ts` computes an order-only OTIF early-warning
+  proxy for open orders that are not yet requested-receipt overdue.
+- `backend/src/functions/otifRisk.ts` exposes `GET /api/analytics/otif-risk`
+  with function-key auth.
+- Risk scoring uses near-due requested receipt, stale ERP sync, long-open age,
+  and missing supplier/classification signals.
+- The response explicitly marks supplier historical delay, promise revision
+  counts, shipment stage, GRN outcome, and true OTIF as unavailable.
+- The originally requested browser-side `src/procurementFollowup.js` predictive
+  enhancement is deferred under the non-negotiable browser-untouched rule.
+- Covered by `backend/test/otifRisk.test.ts` and optional live SQL coverage in
+  `backend/test/otifRisk.integration.test.ts`.
+
+Remaining backend delivery items:
+
+1. F5 - unclassified/unmapped worklist UI.

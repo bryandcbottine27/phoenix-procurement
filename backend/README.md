@@ -254,6 +254,30 @@ for overdue requested receipts, stale ERP sync, and long-open orders. Its
 stage-transition bottlenecks because SQL does not yet contain browser
 `status_log` / `workflows.js` transition history.
 
+### `GET /api/analytics/otif-risk`
+
+Query parameters:
+
+- `entity`
+- `dateFrom` / `dateTo` (`YYYY-MM-DD`, scoped to `date_of_order`)
+- `horizonDays` (default `14`)
+- `longOpenDays` (default `90`)
+- `staleSyncDays` (default `3`)
+- `minRiskScore` (default `20`)
+
+Example:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/analytics/otif-risk?entity=Phoenix&horizonDays=14"
+```
+
+The endpoint returns an order-only early-warning proxy for open orders not yet
+past requested receipt date. It scores near-due requested receipts, stale ERP
+sync, long-open age, and missing classification/supplier fields. It does not
+claim true OTIF prediction: the `coverage` block explicitly excludes supplier
+delay history, promise revision counts, shipment stage, GRN outcome, and true
+OTIF until those datasets are available.
+
 ### Read Indexes
 
 `db/002_kpi_indexes.sql` adds idempotent read indexes for the F1 filters and
@@ -366,4 +390,7 @@ real-SQL/Data Warehouse swap points. F2 added disabled-by-default Graph
 notification scaffolding plus a function-key preview endpoint for order-level
 requested-receipt and stale-sync alerts. F3 added
 `GET /api/analytics/cycle-time` for order-age bottleneck analytics with explicit
-coverage metadata for workflow time-in-stage gaps.
+coverage metadata for workflow time-in-stage gaps. F4 added
+`GET /api/analytics/otif-risk` as an order-only early-warning proxy while the
+browser `PXProcFollowup` predictive enhancement remains deferred under the
+browser-untouched gate rule.

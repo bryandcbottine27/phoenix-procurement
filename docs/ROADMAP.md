@@ -205,7 +205,8 @@ Scope:
 - F1c adds the read endpoint contract, Power BI Web connector notes, real SQL/Data Warehouse swap points, and idempotent read indexes in `backend/db/002_kpi_indexes.sql`.
 - F2 adds disabled-by-default Graph notification scaffolding for responsible-officer requested-receipt and stale-sync alerts, including a function-key dry-run preview endpoint, environment-only Graph settings, recipient-map routing, and SQL integration-ready tests.
 - F3 adds read-only `GET /api/analytics/cycle-time` for order-age, requested-receipt, stale-sync, and long-open bottleneck analytics grouped by officer/supplier/category/function, with explicit coverage limits for true workflow time-in-stage until status history is migrated to SQL.
-- Next delivery item: F4 OTIF early-warning, noting that the handoff describes browser-side work while the current ground rule says browser untouched unless explicitly approved.
+- F4 adds read-only `GET /api/analytics/otif-risk` as an order-only early-warning proxy, with explicit coverage limits for supplier historical delay, promise revisions, shipment stage, GRN outcome, and true OTIF. The browser-side `PXProcFollowup` predictive enhancement remains deferred because the handoff also says browser untouched unless explicitly approved.
+- Next delivery item: F5 unclassified/unmapped worklist, noting that the handoff describes an admin UI while the current ground rule says browser untouched unless explicitly approved.
 - Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
 Acceptance criteria:
