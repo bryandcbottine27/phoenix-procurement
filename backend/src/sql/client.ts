@@ -3,7 +3,20 @@ import { requireSqlConnectionString } from "../config";
 
 let poolPromise: Promise<ConnectionPool> | null = null;
 
-export type SqlParams = Record<string, unknown>;
+export interface TypedSqlParam {
+  type: unknown;
+  value: unknown;
+}
+
+export type SqlParams = Record<string, unknown | TypedSqlParam>;
+
+export function typedParam(type: unknown, value: unknown): TypedSqlParam {
+  return { type, value };
+}
+
+function isTypedSqlParam(value: unknown): value is TypedSqlParam {
+  return !!value && typeof value === "object" && "type" in value && "value" in value;
+}
 
 export function getSqlPool(): Promise<ConnectionPool> {
   if (!poolPromise) {
@@ -32,7 +45,8 @@ export async function queryParams<T = unknown>(
   const pool = executor || await getSqlPool();
   const request = pool.request();
   for (const [name, value] of Object.entries(params)) {
-    request.input(name, value);
+    if (isTypedSqlParam(value)) request.input(name, value.type as never, value.value);
+    else request.input(name, value);
   }
   return request.query<T>(sqlText);
 }

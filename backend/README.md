@@ -69,6 +69,19 @@ The timer function is registered as a safe stub and does nothing unless
 `DW_SYNC_TIMER_ENABLED=true`. Use `DW_SYNC_CRON` to override the default schedule
 when the real Data Warehouse feed is ready.
 
+Orders read endpoint:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/orders?function=technical&pageSize=10"
+```
+
+`GET /api/orders` is a read-only, function-key protected list endpoint over the
+SQL `orders` table. It supports entity/function/order-type/ERP-status/closed/
+supplier/date filters, pagination, and allowlisted sorting. It does not expose
+the raw `phoenix_data` ownership-boundary blob; SQL `status` is exposed only as
+`initialOperationalStatus` because it is seeded on insert and is not live
+Phoenix operational state in the SQL-only feed.
+
 ## Docker SQL Server Example
 
 ```powershell
@@ -109,3 +122,8 @@ queueing, ownership preservation on updates, and parameterized SQL structure.
 
 Gate 4 will add integration tests against local SQL and document the real Data
 Warehouse swap point.
+
+F1a added `GET /api/orders` as the first read-side endpoint for BI/future browser
+consumers. F1b will add honest order-only KPI aggregations and coverage metadata;
+F1c will expand this README with the full endpoint contract, Power BI consumption
+note, and real-SQL/Data Warehouse swap points.

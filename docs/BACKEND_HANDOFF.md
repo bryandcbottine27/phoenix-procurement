@@ -228,3 +228,27 @@ Do not create root zips beyond:
 
 - `Phoenix Procurement DEMO FULL.zip`
 - `Phoenix Procurement PRODUCTION FULL.zip`
+
+## 8. F1 - Read API Gates
+
+F1 adds read-side endpoints over the SQL store for BI and future browser use.
+The SQL backend currently holds ERP order data only, so read APIs must not fake
+shipment/payment/GRN-derived KPIs.
+
+F1a implementation status:
+
+- Implemented `GET /api/orders` in `backend/src/functions/orders.ts`.
+- Query and validation live in `backend/src/kpi/queries.ts`.
+- Row mapping lives in `backend/src/kpi/shape.ts`.
+- The endpoint is function-key protected, read-only, typed-parameterized, and
+  uses an allowlist for sortable SQL column names.
+- Raw `phoenix_data` is not exposed. SQL `status` is mapped only as
+  `initialOperationalStatus`.
+- Covered by `backend/test/ordersRead.test.ts` and optional live SQL coverage in
+  `backend/test/ordersRead.integration.test.ts`.
+
+Remaining F1 gates:
+
+1. F1b - order-only KPI aggregations with coverage metadata.
+2. F1c - README endpoint contract, Power BI consumption note, real-SQL/Data
+   Warehouse swap points, and optional read indexes.
