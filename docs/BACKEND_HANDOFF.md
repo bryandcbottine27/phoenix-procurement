@@ -190,6 +190,15 @@ Requirements:
 
 Use `node:test` against local SQL Server, either Docker SQL Server or LocalDB.
 
+Implementation status:
+
+- Implemented in `backend/test/purchaseOrderSync.integration.test.ts`.
+- Runs when `RUN_SQL_INTEGRATION=true` and `SQL_CONNECTION_STRING` are set.
+- Proven locally against Docker SQL Server with `backend/db/001_init.sql`
+  applied.
+- `backend/README.md` now documents migration, `func start`, sync POST,
+  integration-test command, and real SQL / real Data Warehouse swap points.
+
 Required cases:
 
 - Create new rows.

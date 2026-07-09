@@ -43,6 +43,15 @@ pnpm run db:migrate
 pnpm start
 ```
 
+Local SQL integration test run:
+
+```powershell
+$env:SQL_CONNECTION_STRING='Server=localhost,14333;Database=PhoenixProcurementBackend;User Id=sa;Password=Your_strong_password123;Encrypt=True;TrustServerCertificate=True'
+pnpm run db:migrate
+$env:RUN_SQL_INTEGRATION='true'
+pnpm test
+```
+
 Health endpoint:
 
 ```powershell
@@ -68,6 +77,23 @@ Malformed rows are written to `sync_exceptions`, and every batch writes one
 The timer function is registered as a safe stub and does nothing unless
 `DW_SYNC_TIMER_ENABLED=true`. Use `DW_SYNC_CRON` to override the default schedule
 when the real Data Warehouse feed is ready.
+
+Real SQL swap point:
+
+- Use an Azure SQL / SQL Server connection string supplied through app settings
+  or Key Vault, not `local.settings.json`.
+- Production should use a least-privilege write principal for the WD sync
+  functions and a read-only principal for read APIs.
+- `TrustServerCertificate=True` is local-dev only.
+
+Real Data Warehouse swap point:
+
+- Replace the fixture reader in `src/sources/dwSource.ts` with the approved WD
+  source query/client.
+- Keep the output normalized to `ORDER_CONTRACT_FIELDS` before classification
+  and upsert.
+- Keep failures flowing to `sync_exceptions` and batch summaries to
+  `import_audit`.
 
 Orders read endpoint:
 
@@ -124,8 +150,9 @@ case-insensitive ERP PO status mapping guarded against the browser map,
 `UNCLASSIFIED` sync exception codes, and failed-audit logging for fatal sync
 errors.
 
-Gate 4 will add integration tests against local SQL and document the real Data
-Warehouse swap point.
+Gate 4 added SQL integration tests against Docker SQL Server for create,
+idempotent re-run, ownership preservation, malformed and unclassified
+exceptions, decimal precision, lowercase status mapping, and line grouping.
 
 F1a added `GET /api/orders` as the first read-side endpoint for BI/future browser
 consumers. F1b will add honest order-only KPI aggregations and coverage metadata;
