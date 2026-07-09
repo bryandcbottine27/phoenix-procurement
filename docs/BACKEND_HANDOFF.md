@@ -344,4 +344,22 @@ F4 implementation status:
 
 Remaining backend delivery items:
 
-1. F5 - unclassified/unmapped worklist UI.
+F5 implementation status:
+
+- `backend/src/worklists/unclassified.ts` lists actionable `sync_exceptions`
+  rows for `UNCLASSIFIED`, `UNMAPPED_SUPPLIER`, and `CURRENCY_AMBIGUOUS`.
+- `backend/src/functions/unclassifiedWorklist.ts` exposes
+  `GET /api/worklists/unclassified` with function-key auth.
+- Rows include parsed payload data, summaries, and suggested actions for the
+  future admin UI (`addImportRule`, `mapSupplier`, `resolveCurrencyRule`).
+- The endpoint is read-only. Browser admin UI and one-click write actions remain
+  deferred under the non-negotiable browser-untouched rule and need final write
+  design approval.
+- Covered by `backend/test/unclassifiedWorklist.test.ts` and optional live SQL
+  coverage in `backend/test/unclassifiedWorklist.integration.test.ts`.
+
+Backend-safe handoff status:
+
+- 3b.1 through F5 are implemented and tested in the backend/API path.
+- Deferred browser-specific items: `src/procurementFollowup.js` predictive
+  enhancement and the admin worklist UI/write actions.

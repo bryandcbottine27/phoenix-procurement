@@ -278,6 +278,31 @@ claim true OTIF prediction: the `coverage` block explicitly excludes supplier
 delay history, promise revision counts, shipment stage, GRN outcome, and true
 OTIF until those datasets are available.
 
+### `GET /api/worklists/unclassified`
+
+Query parameters:
+
+- `entity`
+- `status` (default `open`)
+- `errorCode` (`UNCLASSIFIED`, `UNMAPPED_SUPPLIER`, or `CURRENCY_AMBIGUOUS`)
+- `page` (default `1`)
+- `pageSize` (default `50`, max `200`)
+- `sort` (`created_at`, `error_code`, `entity`, or `order_id`, with `asc` or
+  `desc`)
+
+Example:
+
+```powershell
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } "http://localhost:7071/api/worklists/unclassified?entity=Phoenix&errorCode=UNCLASSIFIED"
+```
+
+The endpoint returns actionable sync exceptions for the future admin worklist:
+unclassified function rows, unmapped supplier rows, and currency-ambiguous rows.
+Each row includes a `suggestedAction` such as `addImportRule`, `mapSupplier`, or
+`resolveCurrencyRule`. The endpoint is read-only; the browser admin screen and
+one-click write actions remain deferred until the rule/supplier mapping write
+design is approved.
+
 ### Read Indexes
 
 `db/002_kpi_indexes.sql` adds idempotent read indexes for the F1 filters and
@@ -393,4 +418,6 @@ requested-receipt and stale-sync alerts. F3 added
 coverage metadata for workflow time-in-stage gaps. F4 added
 `GET /api/analytics/otif-risk` as an order-only early-warning proxy while the
 browser `PXProcFollowup` predictive enhancement remains deferred under the
-browser-untouched gate rule.
+browser-untouched gate rule. F5 added `GET /api/worklists/unclassified` as the
+backend data API for the future unclassified/unmapped admin worklist, while the
+browser UI and one-click write actions remain deferred under the same rule.
