@@ -71,7 +71,7 @@ let activeAdapter = adapters.Navision;
 
 function integrationNotice(label) {
   const warehouse = window.PXWarehouse?.describe ? window.PXWarehouse.describe() : NOT_CONNECTED;
-  const message = `${label}: Data Warehouse sync is not connected yet. Use Excel import as the controlled manual feed during demo/pilot.`;
+  const message = `${label}: Data Warehouse sync is not connected yet. Use Excel import as the controlled manual feed until the approved sync is live.`;
   if (window.PXUtils?.toast) window.PXUtils.toast(message, 'info');
   return { ...warehouse, message };
 }

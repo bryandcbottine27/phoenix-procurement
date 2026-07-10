@@ -1,6 +1,6 @@
 # Phoenix Procurement - Business Rules
 
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-10
 
 This document distinguishes confirmed rules from assumptions and unresolved questions. Before changing procurement, logistics, finance, import, or access behaviour, check this file and `docs/DECISIONS.md`.
 
@@ -304,7 +304,9 @@ Confirmed principles:
 - Production officer profiles with no assigned role also fail closed; they must not fall back to stakeholder visibility.
 - Stream-scoped procurement roles only see their relevant function stream.
 - View-only users must not be able to write through hidden buttons, stale onclicks, or console calls because `PXStore` enforces write permissions.
-- Firestore rules must enforce the same access model server-side before production.
+- Server-side authorization must enforce the same access model before production.
+  In API mode this belongs at the internal gateway/backend layer; if Firebase is
+  reselected, Firestore rules must enforce the same model.
 
 Request Update visibility:
 
@@ -332,7 +334,8 @@ Current exceptions:
 
 - Demo purge hard-deletes test data only in isolated demo/admin mode and must remain disabled by default for shared testing, pilot, and production.
 - Officer bootstrap writes the user profile directly during sign-in.
-- RFP counter uses Firestore transaction.
+- RFP counter uses a Firestore transaction in demo/Firebase mode and the backend
+  SQL counter endpoint in API mode.
 
 ## 13. Notifications, My Work, and warnings
 
@@ -381,8 +384,10 @@ Assumption:
 
 ## 15. Unresolved questions
 
-- Final production identity approach: Firebase email/password versus Azure AD/M365 SSO/custom token.
-- Final Firestore rule design and deployment owner.
+- Final production identity approach: Entra ID/M365 SSO, Windows-integrated access,
+  APIM/internal gateway policy, Firebase email/password, or another IT-approved path.
+- Final server-side authorization owner and deployment mechanism. If Firebase is
+  reselected, this includes Firestore rule design/deployment.
 - SharePoint Graph adapter details and retention/delete rules.
 - Data Warehouse source table/view names and batch/error-monitoring contract.
 - Whether production zips should remain in the project folder or be moved to a formal release location.

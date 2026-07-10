@@ -12,7 +12,7 @@ window.openBackupDialog = function() {
   const erpStatus = (window.PhoenixERP && window.PhoenixERP.getActiveAdapter) ? window.PhoenixERP.getActiveAdapter() : { name: 'Manual', connected: false };
   window.openModal(`
     <div class="modal-head">
-      <div><h2>Backup / Export All Data</h2><div class="sub">Prototype backup utility</div></div>
+      <div><h2>Backup / Export All Data</h2><div class="sub">Full application snapshot</div></div>
       <button class="btn btn-ghost btn-icon" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
@@ -66,13 +66,15 @@ window.openBackupDialog = function() {
   }
 
   function buildMeta(statusLogLen, systemConfigLen) {
+    const apiMode = !!(window.__usesApiDataMode && window.__usesApiDataMode());
     return {
-      app: 'Phoenix Procurement (prototype)',
-      project: 'phoenix-procurement2',
+      app: 'Phoenix Procurement',
+      dataMode: apiMode ? 'api' : 'firebase',
+      project: apiMode ? 'internal-sql-api' : 'phoenix-procurement2',
       prototypeVersion: REF.prototypeVersion,
       exportedBy: state.officer?.code || state.user?.email || 'unknown',
       exportedAt: new Date().toISOString(),
-      erpIntegrationStatus: `${erpStatus.name} — ${erpStatus.connected ? 'connected' : 'not connected (prototype)'}`,
+      erpIntegrationStatus: `${erpStatus.name} — ${erpStatus.connected ? 'connected' : 'not connected (manual feed)'}`,
       collectionCounts: {
         orders: state.data.orders.length,
         shipments: state.data.shipments.length,
@@ -128,5 +130,5 @@ window.openBackupDialog = function() {
    ERP RECONCILIATION VIEW (item 6)
    Shows mismatches & sync issues between Phoenix and the ERP.
    Until the plug-in feeds ERP data, this honestly shows manual orders
-   as "not linked to ERP" plus a prototype notice.
+   as "not linked to ERP" plus a manual-feed notice.
 ============================================================ */

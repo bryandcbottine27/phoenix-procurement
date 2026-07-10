@@ -620,8 +620,8 @@ window.__renderers['erprecon'] = function() {
   // Status divergence: ERP says closed, Phoenix open (and vice versa) — uses erpPoStatus if present
   const erpClosedPhoenixOpen = erpOrders.filter(o => (o.erpPoStatus === 'Closed' || o.erpPoStatus === 'Cancelled') && !o.isClosed);
   const phoenixClosedErpOpen = erpOrders.filter(o => o.isClosed && o.erpPoStatus && !['Closed','Cancelled'].includes(o.erpPoStatus));
-  // Field mismatches (only meaningful if the staging/sync service stored the ERP-side value separately;
-  // in prototype these will be empty — shown for completeness)
+  // Field mismatches are only meaningful if the staging/sync service stores the ERP-side value separately.
+  // Until that feed is connected, these lists stay empty by design.
   const supplierMismatch = erpOrders.filter(o => o.erpVendorName && o.supplier && o.erpVendorName !== o.supplier);
   const amountMismatch = erpOrders.filter(o => o.erpAmount != null && o.amount != null && Number(o.erpAmount) !== Number(o.amount));
   const currencyMismatch = erpOrders.filter(o => o.erpCurrency && o.currency && o.erpCurrency !== o.currency);
@@ -631,6 +631,7 @@ window.__renderers['erprecon'] = function() {
   const procurementExceptions = window.PXProcFollowup
     ? erpOrders.map(o => ({ order: o, exceptions: window.PXProcFollowup.erpExceptions(o) })).filter(x => x.exceptions.length)
     : [];
+  const demoMode = !!(window.__isDemoMode && window.__isDemoMode());
 
   const lastSync = erpOrders.map(o => o.erpLastSyncedAt?.toDate ? o.erpLastSyncedAt.toDate() : (o.erpLastSyncedAt ? new Date(o.erpLastSyncedAt) : null)).filter(Boolean).sort((a,b)=>b-a)[0];
 
@@ -670,7 +671,7 @@ window.__renderers['erprecon'] = function() {
         <input type="file" id="erp-import-file" accept=".xlsx" style="display:none" />
         <button class="btn" id="erp-statusmig-btn" title="One-off: import the old workbook's free-text STATUS history as follow-up notes on matching orders">⬆ Migrate legacy status log</button>
         <input type="file" id="erp-statusmig-file" accept=".xlsm,.xlsx" style="display:none" />
-        <button class="btn" id="erp-demo-btn" title="Prototype: creates one sample ERP-sourced order with lines so you can preview the ERP experience">+ Sample ERP order</button>
+        ${demoMode ? '<button class="btn" id="erp-demo-btn" title="Demo helper: creates one sample ERP-sourced order with lines so you can preview the ERP experience">+ Sample ERP order</button>' : ''}
         <button class="btn" id="erp-recon-btn">Run reconciliation</button>
       </div>
     </div>
@@ -683,7 +684,7 @@ window.__renderers['erprecon'] = function() {
         <strong>Phoenix is an operational control layer on top of the ERP.</strong><br>
         Recommended integration path: <strong>Navision / Business Central → Data Warehouse / staging → controlled sync/API service → Phoenix</strong>. The browser should not connect directly to either ERP or the warehouse.<br>
         ERP/warehouse data is read-only. Operational follow-up is managed in Phoenix.
-        ${lastSync ? `<br><span class="text-xs">Last ERP/feed sync: ${fmtDate(lastSync)}</span>` : '<br><span class="text-xs">Data Warehouse sync is not connected yet. Use the Excel import as the controlled manual feed during demo/pilot.</span>'}
+        ${lastSync ? `<br><span class="text-xs">Last ERP/feed sync: ${fmtDate(lastSync)}</span>` : '<br><span class="text-xs">Data Warehouse sync is not connected yet. Use the Excel import as the controlled manual feed until the approved sync is live.</span>'}
       </div>
     </div>
 
@@ -698,7 +699,7 @@ window.__renderers['erprecon'] = function() {
     </div>
 
     ${card('Phoenix orders not linked to ERP', manualOrders,
-      'Manually-created orders with no ERP counterpart. Once the Data Warehouse feed is connected, approved POs arrive through the staging layer and this list should shrink to genuine prototype/manual entries.',
+      'Manually-created orders with no ERP counterpart. Once the Data Warehouse feed is connected, approved POs arrive through the staging layer and this list should shrink to genuine manual exceptions.',
       orderRow, ['Order','Supplier','Amount','Source'])}
 
     ${card('Sync errors', syncErrors,
@@ -1000,8 +1001,9 @@ window.__renderers['erprecon'] = function() {
       smFile.value = '';
     });
   }
-  $('#erp-demo-btn').addEventListener('click', async () => {
-    if (!confirm('Create one SAMPLE ERP-sourced order (with PO lines) for demo/preview?\n\nThis is a prototype helper — it makes a normal order tagged as if it came from Navision, so you can see the ERP experience. You can delete it afterward like any order.')) return;
+  const demoBtn = $('#erp-demo-btn');
+  if (demoBtn) demoBtn.addEventListener('click', async () => {
+    if (!confirm('Create one SAMPLE ERP-sourced order (with PO lines) for demo/preview?\n\nThis demo helper makes a normal order tagged as if it came from Navision, so you can see the ERP experience. You can delete it afterward like any order.')) return;
     const stamp = Date.now().toString().slice(-4);
     const sample = {
       orderId: 'FPO9' + stamp,

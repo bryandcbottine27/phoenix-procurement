@@ -1,6 +1,6 @@
 # Phoenix Procurement - Decisions
 
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-10
 
 This file records decisions that future developers must not accidentally reverse.
 
@@ -66,19 +66,28 @@ Rejected/changed:
 - Direct ERP connector from browser to Navision/BC is rejected/parked.
 - Manual Excel import remains the demo/staging substitute until the warehouse feed is ready.
 
-### Firestore remains current data store
+### Demo uses Firestore; production package uses internal SQL/API
 
-Decision: Cloud Firestore is the current operational database.
+Decision: Firebase/Firestore is retained only for the demo build and for a
+future fallback if IT explicitly reselects that path. The current production
+package is staged for the internal SQL/API backend (`dataMode: 'api'`) and does
+not load Firebase modules by default.
 
 Reason:
 
-- Existing app is built around Firestore live subscriptions.
-- Prototype already uses Firebase Auth/Firestore.
-- Good fit for rapid operational workflow and dashboard changes.
+- Existing demo workflows and regression checks still cover the Firestore-shaped
+  browser state.
+- The deployment target is now an internal local/private environment where the
+  user has confirmed Firebase will not be used.
+- The backend SQL/API path avoids browser-held ERP/Data Warehouse credentials and
+  prepares for private server-side integration.
 
 Constraint:
 
-- Production requires proper Firebase project separation, security rules, and authenticated users.
+- Production/API mode requires server-side identity and authorization at the
+  internal gateway/backend layer before pilot or go-live.
+- If Firebase is later reselected, it again requires proper Firebase project
+  separation, security rules, and authenticated users.
 
 ### Centralized writes through PXStore
 
@@ -91,8 +100,12 @@ Reason:
 
 Allowed exceptions:
 
-- Officer profile bootstrap in `core.js`, because the officer document id must equal the Firebase Auth UID and runs before the normal state is ready.
-- Atomic RFP counter `runTransaction` in `payments.service.js`.
+- Officer profile bootstrap in `core.js`, because Firebase/password mode needs the
+  officer document id to equal the Firebase Auth UID and the code runs before the
+  normal state is ready. API/internal mode uses a local operator profile until IT
+  supplies the final identity path.
+- Atomic RFP counter in `payments.service.js`: Firestore `runTransaction` in
+  demo/Firebase mode and backend SQL counter endpoint in API mode.
 - Demo-only full purge in `erpImport.js`, guarded to demo/admin only and disabled by default, for isolated demo reset testing only.
 - Internal `PXStore` itself, because it wraps the Firestore primitives.
 

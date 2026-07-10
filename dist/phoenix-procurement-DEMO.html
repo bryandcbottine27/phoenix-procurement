@@ -1071,9 +1071,9 @@ table.data tfoot td { font-weight: 600; background: var(--surface-warm); padding
 .ladder-mini .dot.overdue { background: var(--danger); }
 .ladder-mini .dot.due-soon { background: var(--warn); }
 
-/* Test-mode banner — visible but unobtrusive */
+/* Demo-mode banner - hidden unless enabled by the demo build */
 .test-mode-banner {
-  display: flex; align-items: center; justify-content: center; gap: 12px;
+  display: none; align-items: center; justify-content: center; gap: 12px;
   background: repeating-linear-gradient(45deg, #8a5a2b, #8a5a2b 12px, #7a4f25 12px, #7a4f25 24px);
   color: #fff; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
   padding: 4px 12px; text-align: center; position: relative;
@@ -2750,8 +2750,8 @@ body.bc-struct .sync-status {
 <div id="app">
 
   <div class="test-mode-banner" id="test-mode-banner">
-    <span>⚠ TEST MODE — prototype data only</span>
-    <button onclick="document.getElementById('test-mode-banner').style.display='none'" title="Dismiss for this session">✕</button>
+    <span id="test-mode-banner-text"></span>
+    <button onclick="document.getElementById('test-mode-banner').style.display='none'" title="Dismiss for this session">x</button>
   </div>
 
   <header class="app-header">
@@ -3198,6 +3198,14 @@ function usesApiDataMode() {
 function isDemoMode() { return !!(window.APP_CONFIG && window.APP_CONFIG.demoMode); }
 window.__isDemoMode = isDemoMode;
 window.__usesApiDataMode = usesApiDataMode;
+function configureTestModeBanner() {
+  const banner = document.getElementById('test-mode-banner');
+  const text = document.getElementById('test-mode-banner-text');
+  const demoMode = isDemoMode();
+  if (text) text.textContent = demoMode ? 'DEMO MODE - sample data only' : '';
+  if (banner) banner.style.display = demoMode ? 'flex' : 'none';
+}
+configureTestModeBanner();
 function usesPasswordAuth() {
   if (usesApiDataMode()) return window.APP_CONFIG && window.APP_CONFIG.authMode === 'password';
   return (window.APP_CONFIG && window.APP_CONFIG.authMode === 'password') || !isDemoMode();
@@ -4373,6 +4381,8 @@ const state = {
     importRules: [],
     businessCalendars: [],
     importRuns: [],
+    statusLog: [],
+    systemConfig: [],
     documents: [],
     followups: [],
     issues: [],
@@ -5339,6 +5349,10 @@ function subscribeAll() {
   state.unsubs.push(onSnapshot(query(collection(db, 'system_config'), where('configKey', '==', 'erp_import_rules')),
     snap => {
       const configs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.data.systemConfig = [
+        ...(state.data.systemConfig || []).filter(item => item.configKey !== 'erp_import_rules'),
+        ...configs
+      ];
       const config = configs[0] || null;
       state.importRuleConfigId = config ? config.id : null;
       state.data.importRules = config && Array.isArray(config.rules) ? config.rules : [];
@@ -5349,6 +5363,10 @@ function subscribeAll() {
   state.unsubs.push(onSnapshot(query(collection(db, 'system_config'), where('configKey', '==', 'business_calendars')),
     snap => {
       const configs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.data.systemConfig = [
+        ...(state.data.systemConfig || []).filter(item => item.configKey !== 'business_calendars'),
+        ...configs
+      ];
       const config = configs[0] || null;
       state.calendarConfigId = config ? config.id : null;
       state.data.businessCalendars = config && Array.isArray(config.calendars) ? config.calendars : [];
@@ -5359,11 +5377,12 @@ function subscribeAll() {
 
   state.unsubs.push(onSnapshot(query(collection(db, 'status_log'), orderBy('at', 'desc'), limit(100)),
     snap => {
-      state.data.importRuns = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(entry => entry.entryType === 'erp_import_run');
+      state.data.statusLog = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.data.importRuns = state.data.statusLog.filter(entry => entry.entryType === 'erp_import_run');
       const importPreviewOpen = state.view === 'erprecon' && $('#erp-import-panel')?.childElementCount;
       if (state.view === 'erprecon' && !importPreviewOpen) renderView('erprecon');
     },
-    err => console.error('ERP import history sub error', err)));
+    err => { state.data.statusLog = []; state.data.importRuns = []; console.error('ERP import history sub error', err); }));
 
   // ---- Phoenix-owned operational collections (documents, follow-ups, issues) ----
   state.unsubs.push(onSnapshot(collection(db, 'documents'),
@@ -7733,7 +7752,8 @@ $('#print-back').addEventListener('click', () => {
 
    Prototype stance: permissive by default — unknown combinations are allowed so
    the app never locks out legitimate work. This is UI-layer guidance; real
-   server-side enforcement comes with real login (same matrix → Firestore rules).
+   server-side enforcement must come from the chosen production backend/gateway
+   policy. If Firebase is reselected, the same matrix feeds Firestore rules.
 
    NOTE (Path B): exposed as window.PXPermissions; convertible to ES export later. */
 (function () {
@@ -7843,6 +7863,9 @@ $('#print-back').addEventListener('click', () => {
     const out = { ...(extra || {}) };
     const key = window.APP_CONFIG && window.APP_CONFIG.apiFunctionKey;
     if (key) out['x-functions-key'] = key;
+    const officer = state && state.officer;
+    const actor = (officer && (officer.code || officer.email || officer.fullName)) || '';
+    if (actor) out['x-phoenix-user'] = String(actor);
     return out;
   }
   async function request(path, options) {
@@ -7874,6 +7897,7 @@ $('#print-back').addEventListener('click', () => {
     });
 
     const configs = Array.isArray(grouped.system_config) ? grouped.system_config : [];
+    state.data.systemConfig = configs;
     const importConfig = configs.find(item => item.configKey === 'erp_import_rules') || null;
     const calendarConfig = configs.find(item => item.configKey === 'business_calendars') || null;
     state.importRuleConfigId = importConfig ? importConfig.id : null;
@@ -7882,6 +7906,7 @@ $('#print-back').addEventListener('click', () => {
     state.data.businessCalendars = calendarConfig && Array.isArray(calendarConfig.calendars) ? calendarConfig.calendars : [];
 
     const statusLog = Array.isArray(grouped.status_log) ? grouped.status_log : [];
+    state.data.statusLog = statusLog;
     state.data.importRuns = statusLog.filter(entry => entry.entryType === 'erp_import_run');
   }
   async function loadAll() {
@@ -7924,6 +7949,13 @@ $('#print-back').addEventListener('click', () => {
     await loadAll();
     return payload.id || id;
   }
+  async function nextCounter(counterKey) {
+    const payload = await request(`/counters/${encodeURIComponent(counterKey)}/next`, {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    return Number(payload.value || 0);
+  }
   async function logStatusChange(recordType, recordId, action, details, extraFields) {
     await createRecord('status_log', {
       ...(extraFields || {}),
@@ -7936,14 +7968,14 @@ $('#print-back').addEventListener('click', () => {
 
   window.PXApiClient = {
     enabled, loadAll, applySnapshot,
-    createRecord, updateRecord, archiveRecord, restoreRecord, logStatusChange
+    createRecord, updateRecord, archiveRecord, restoreRecord, nextCounter, logStatusChange
   };
 })();
 
 </script>
 <script type="module">
 /* ============================================================
-   CENTRALISED FIRESTORE STORE — firestoreStore.js  (Stage 2a, extracted in cleanup)
+   CENTRALISED BROWSER STORE — firestoreStore.js  (Stage 2a, extracted in cleanup)
    ============================================================
    The ONE place writes happen. Every create/update/archive routes through here so
    behaviour is consistent:
@@ -7953,8 +7985,9 @@ $('#print-back').addEventListener('click', () => {
      • optional status/audit logging to status_log
 
    Modules call window.PXStore.* — never addDoc/updateDoc/deleteDoc directly.
-   Uses window.__db, window.__fs (Firestore primitives), window.__state, and
-   window.PXUtils.stripUndefined — all set up by core.js, which loads first. */
+   In Firebase data mode it uses Firestore primitives. In API data mode it delegates
+   to PXApiClient. Uses window.__state and window.PXUtils.stripUndefined — all set up
+   by core.js, which loads first. */
 (function () {
   const db = window.__db;
   const { collection, doc, addDoc, updateDoc, serverTimestamp } = window.__fs;
@@ -17347,6 +17380,13 @@ async function nextRfpRef(entityCode) {
   const year = new Date().getFullYear();
   const meta = entityMeta(entityCode || currentEntity());
   const prefix = meta.rfpPrefix || 'PHX';
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    if (!window.PXApiClient || !window.PXApiClient.nextCounter) {
+      throw new Error('Internal API counter service is not available.');
+    }
+    const next = await window.PXApiClient.nextCounter(`rfp:${meta.code}:${prefix}:${year}`);
+    return `${prefix}/${year}/IMP/${String(next).padStart(3, '0')}`;
+  }
   // Per-entity counter so each company has its own sequence
   const counterRef = doc(db, 'system_config', `rfp_counter_${prefix}_${year}`);
   return await runTransaction(db, async tx => {
@@ -20396,6 +20436,9 @@ function rowsToCSV(rows) {
 }
 
 async function fetchStatusLog() {
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    return Array.isArray(state.data.statusLog) ? state.data.statusLog : [];
+  }
   try {
     const snap = await getDocs(collection(db, 'status_log'));
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -20403,6 +20446,9 @@ async function fetchStatusLog() {
 }
 
 async function fetchSystemConfig() {
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    return Array.isArray(state.data.systemConfig) ? state.data.systemConfig : [];
+  }
   try {
     const snap = await getDocs(collection(db, 'system_config'));
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -21255,8 +21301,8 @@ window.__renderers['erprecon'] = function() {
   // Status divergence: ERP says closed, Phoenix open (and vice versa) — uses erpPoStatus if present
   const erpClosedPhoenixOpen = erpOrders.filter(o => (o.erpPoStatus === 'Closed' || o.erpPoStatus === 'Cancelled') && !o.isClosed);
   const phoenixClosedErpOpen = erpOrders.filter(o => o.isClosed && o.erpPoStatus && !['Closed','Cancelled'].includes(o.erpPoStatus));
-  // Field mismatches (only meaningful if the staging/sync service stored the ERP-side value separately;
-  // in prototype these will be empty — shown for completeness)
+  // Field mismatches are only meaningful if the staging/sync service stores the ERP-side value separately.
+  // Until that feed is connected, these lists stay empty by design.
   const supplierMismatch = erpOrders.filter(o => o.erpVendorName && o.supplier && o.erpVendorName !== o.supplier);
   const amountMismatch = erpOrders.filter(o => o.erpAmount != null && o.amount != null && Number(o.erpAmount) !== Number(o.amount));
   const currencyMismatch = erpOrders.filter(o => o.erpCurrency && o.currency && o.erpCurrency !== o.currency);
@@ -21266,6 +21312,7 @@ window.__renderers['erprecon'] = function() {
   const procurementExceptions = window.PXProcFollowup
     ? erpOrders.map(o => ({ order: o, exceptions: window.PXProcFollowup.erpExceptions(o) })).filter(x => x.exceptions.length)
     : [];
+  const demoMode = !!(window.__isDemoMode && window.__isDemoMode());
 
   const lastSync = erpOrders.map(o => o.erpLastSyncedAt?.toDate ? o.erpLastSyncedAt.toDate() : (o.erpLastSyncedAt ? new Date(o.erpLastSyncedAt) : null)).filter(Boolean).sort((a,b)=>b-a)[0];
 
@@ -21305,7 +21352,7 @@ window.__renderers['erprecon'] = function() {
         <input type="file" id="erp-import-file" accept=".xlsx" style="display:none" />
         <button class="btn" id="erp-statusmig-btn" title="One-off: import the old workbook's free-text STATUS history as follow-up notes on matching orders">⬆ Migrate legacy status log</button>
         <input type="file" id="erp-statusmig-file" accept=".xlsm,.xlsx" style="display:none" />
-        <button class="btn" id="erp-demo-btn" title="Prototype: creates one sample ERP-sourced order with lines so you can preview the ERP experience">+ Sample ERP order</button>
+        ${demoMode ? '<button class="btn" id="erp-demo-btn" title="Demo helper: creates one sample ERP-sourced order with lines so you can preview the ERP experience">+ Sample ERP order</button>' : ''}
         <button class="btn" id="erp-recon-btn">Run reconciliation</button>
       </div>
     </div>
@@ -21318,7 +21365,7 @@ window.__renderers['erprecon'] = function() {
         <strong>Phoenix is an operational control layer on top of the ERP.</strong><br>
         Recommended integration path: <strong>Navision / Business Central → Data Warehouse / staging → controlled sync/API service → Phoenix</strong>. The browser should not connect directly to either ERP or the warehouse.<br>
         ERP/warehouse data is read-only. Operational follow-up is managed in Phoenix.
-        ${lastSync ? `<br><span class="text-xs">Last ERP/feed sync: ${fmtDate(lastSync)}</span>` : '<br><span class="text-xs">Data Warehouse sync is not connected yet. Use the Excel import as the controlled manual feed during demo/pilot.</span>'}
+        ${lastSync ? `<br><span class="text-xs">Last ERP/feed sync: ${fmtDate(lastSync)}</span>` : '<br><span class="text-xs">Data Warehouse sync is not connected yet. Use the Excel import as the controlled manual feed until the approved sync is live.</span>'}
       </div>
     </div>
 
@@ -21333,7 +21380,7 @@ window.__renderers['erprecon'] = function() {
     </div>
 
     ${card('Phoenix orders not linked to ERP', manualOrders,
-      'Manually-created orders with no ERP counterpart. Once the Data Warehouse feed is connected, approved POs arrive through the staging layer and this list should shrink to genuine prototype/manual entries.',
+      'Manually-created orders with no ERP counterpart. Once the Data Warehouse feed is connected, approved POs arrive through the staging layer and this list should shrink to genuine manual exceptions.',
       orderRow, ['Order','Supplier','Amount','Source'])}
 
     ${card('Sync errors', syncErrors,
@@ -21635,8 +21682,9 @@ window.__renderers['erprecon'] = function() {
       smFile.value = '';
     });
   }
-  $('#erp-demo-btn').addEventListener('click', async () => {
-    if (!confirm('Create one SAMPLE ERP-sourced order (with PO lines) for demo/preview?\n\nThis is a prototype helper — it makes a normal order tagged as if it came from Navision, so you can see the ERP experience. You can delete it afterward like any order.')) return;
+  const demoBtn = $('#erp-demo-btn');
+  if (demoBtn) demoBtn.addEventListener('click', async () => {
+    if (!confirm('Create one SAMPLE ERP-sourced order (with PO lines) for demo/preview?\n\nThis demo helper makes a normal order tagged as if it came from Navision, so you can see the ERP experience. You can delete it afterward like any order.')) return;
     const stamp = Date.now().toString().slice(-4);
     const sample = {
       orderId: 'FPO9' + stamp,
@@ -21692,7 +21740,7 @@ window.openBackupDialog = function() {
   const erpStatus = (window.PhoenixERP && window.PhoenixERP.getActiveAdapter) ? window.PhoenixERP.getActiveAdapter() : { name: 'Manual', connected: false };
   window.openModal(`
     <div class="modal-head">
-      <div><h2>Backup / Export All Data</h2><div class="sub">Prototype backup utility</div></div>
+      <div><h2>Backup / Export All Data</h2><div class="sub">Full application snapshot</div></div>
       <button class="btn btn-ghost btn-icon" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-body">
@@ -21746,13 +21794,15 @@ window.openBackupDialog = function() {
   }
 
   function buildMeta(statusLogLen, systemConfigLen) {
+    const apiMode = !!(window.__usesApiDataMode && window.__usesApiDataMode());
     return {
-      app: 'Phoenix Procurement (prototype)',
-      project: 'phoenix-procurement2',
+      app: 'Phoenix Procurement',
+      dataMode: apiMode ? 'api' : 'firebase',
+      project: apiMode ? 'internal-sql-api' : 'phoenix-procurement2',
       prototypeVersion: REF.prototypeVersion,
       exportedBy: state.officer?.code || state.user?.email || 'unknown',
       exportedAt: new Date().toISOString(),
-      erpIntegrationStatus: `${erpStatus.name} — ${erpStatus.connected ? 'connected' : 'not connected (prototype)'}`,
+      erpIntegrationStatus: `${erpStatus.name} — ${erpStatus.connected ? 'connected' : 'not connected (manual feed)'}`,
       collectionCounts: {
         orders: state.data.orders.length,
         shipments: state.data.shipments.length,
@@ -21808,7 +21858,7 @@ window.openBackupDialog = function() {
    ERP RECONCILIATION VIEW (item 6)
    Shows mismatches & sync issues between Phoenix and the ERP.
    Until the plug-in feeds ERP data, this honestly shows manual orders
-   as "not linked to ERP" plus a prototype notice.
+   as "not linked to ERP" plus a manual-feed notice.
 ============================================================ */
 
 </script>
@@ -25963,7 +26013,7 @@ let activeAdapter = adapters.Navision;
 
 function integrationNotice(label) {
   const warehouse = window.PXWarehouse?.describe ? window.PXWarehouse.describe() : NOT_CONNECTED;
-  const message = `${label}: Data Warehouse sync is not connected yet. Use Excel import as the controlled manual feed during demo/pilot.`;
+  const message = `${label}: Data Warehouse sync is not connected yet. Use Excel import as the controlled manual feed until the approved sync is live.`;
   if (window.PXUtils?.toast) window.PXUtils.toast(message, 'info');
   return { ...warehouse, message };
 }

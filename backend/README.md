@@ -18,6 +18,7 @@ root `build.py` validation.
   - `dbo.import_audit`
   - `dbo.notification_state`
   - `dbo.operational_records`
+  - `dbo.app_counters`
 
 ## Local Prerequisites
 
@@ -45,6 +46,12 @@ pnpm run build
 pnpm run db:migrate
 pnpm start
 ```
+
+Full `func start` runs timer listeners as well as HTTP triggers. For a clean
+local host run, provide a reachable `AzureWebJobsStorage` value, such as Azurite
+or an approved Azure Storage account. If storage is missing or unreachable, the
+HTTP endpoints can still be smoke-tested, but the host may report storage-health
+warnings for timer infrastructure.
 
 Local SQL integration test run:
 
@@ -144,11 +151,21 @@ function-key protected operational record routes:
 - `PATCH /api/records/{collection}/{id}`
 - `POST /api/records/{collection}/{id}/archive`
 - `POST /api/records/{collection}/{id}/restore`
+- `POST /api/counters/{counterKey}/next`
 
 Allowed collections are hard-coded in `src/operational/records.ts` and mirror the
 browser business collections. Records are stored in `dbo.operational_records` as
 allowlisted collection/name pairs with JSON payload, SQL timestamps, soft archive
 flags, and a stale-write guard based on `updated_at`.
+
+`PXApiClient` sends the current operator code in `x-phoenix-user` so backend audit
+metadata such as `archivedBy` is not stamped as a generic API user during internal
+testing. This is attribution only; final identity and authorization enforcement
+must still come from the IT-approved server-side gateway/backend policy.
+
+`POST /api/counters/{counterKey}/next` returns an atomic SQL-backed integer from
+`dbo.app_counters`. The first browser use is API-mode RFP numbering, replacing the
+Firestore transaction used in demo/Firebase mode.
 
 This operational JSON table is a practical internal-server bridge for testing
 without Firebase. It is not a final normalized data warehouse model; IT/business
@@ -347,6 +364,12 @@ receipt exposure, open sync exceptions, and latest import audit lookup.
 
 `db/003_notification_state.sql` adds the F2 notification sent-state table used
 to suppress repeated order-alert digest items between timer runs.
+
+`db/004_operational_records.sql` adds the internal browser API-mode operational
+record table.
+
+`db/005_app_counters.sql` adds SQL-backed counters used for API-mode generated
+references such as RFP numbers.
 
 ## Order Alert Notifications
 

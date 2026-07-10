@@ -1,5 +1,5 @@
 /* ============================================================
-   CENTRALISED FIRESTORE STORE — firestoreStore.js  (Stage 2a, extracted in cleanup)
+   CENTRALISED BROWSER STORE — firestoreStore.js  (Stage 2a, extracted in cleanup)
    ============================================================
    The ONE place writes happen. Every create/update/archive routes through here so
    behaviour is consistent:
@@ -9,8 +9,9 @@
      • optional status/audit logging to status_log
 
    Modules call window.PXStore.* — never addDoc/updateDoc/deleteDoc directly.
-   Uses window.__db, window.__fs (Firestore primitives), window.__state, and
-   window.PXUtils.stripUndefined — all set up by core.js, which loads first. */
+   In Firebase data mode it uses Firestore primitives. In API data mode it delegates
+   to PXApiClient. Uses window.__state and window.PXUtils.stripUndefined — all set up
+   by core.js, which loads first. */
 (function () {
   const db = window.__db;
   const { collection, doc, addDoc, updateDoc, serverTimestamp } = window.__fs;

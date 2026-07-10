@@ -13,7 +13,8 @@
 
    Prototype stance: permissive by default — unknown combinations are allowed so
    the app never locks out legitimate work. This is UI-layer guidance; real
-   server-side enforcement comes with real login (same matrix → Firestore rules).
+   server-side enforcement must come from the chosen production backend/gateway
+   policy. If Firebase is reselected, the same matrix feeds Firestore rules.
 
    NOTE (Path B): exposed as window.PXPermissions; convertible to ES export later. */
 (function () {

@@ -1055,9 +1055,9 @@ table.data tfoot td { font-weight: 600; background: var(--surface-warm); padding
 .ladder-mini .dot.overdue { background: var(--danger); }
 .ladder-mini .dot.due-soon { background: var(--warn); }
 
-/* Test-mode banner — visible but unobtrusive */
+/* Demo-mode banner - hidden unless enabled by the demo build */
 .test-mode-banner {
-  display: flex; align-items: center; justify-content: center; gap: 12px;
+  display: none; align-items: center; justify-content: center; gap: 12px;
   background: repeating-linear-gradient(45deg, #8a5a2b, #8a5a2b 12px, #7a4f25 12px, #7a4f25 24px);
   color: #fff; font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
   padding: 4px 12px; text-align: center; position: relative;

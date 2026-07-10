@@ -28,6 +28,9 @@
     const out = { ...(extra || {}) };
     const key = window.APP_CONFIG && window.APP_CONFIG.apiFunctionKey;
     if (key) out['x-functions-key'] = key;
+    const officer = state && state.officer;
+    const actor = (officer && (officer.code || officer.email || officer.fullName)) || '';
+    if (actor) out['x-phoenix-user'] = String(actor);
     return out;
   }
   async function request(path, options) {
@@ -59,6 +62,7 @@
     });
 
     const configs = Array.isArray(grouped.system_config) ? grouped.system_config : [];
+    state.data.systemConfig = configs;
     const importConfig = configs.find(item => item.configKey === 'erp_import_rules') || null;
     const calendarConfig = configs.find(item => item.configKey === 'business_calendars') || null;
     state.importRuleConfigId = importConfig ? importConfig.id : null;
@@ -67,6 +71,7 @@
     state.data.businessCalendars = calendarConfig && Array.isArray(calendarConfig.calendars) ? calendarConfig.calendars : [];
 
     const statusLog = Array.isArray(grouped.status_log) ? grouped.status_log : [];
+    state.data.statusLog = statusLog;
     state.data.importRuns = statusLog.filter(entry => entry.entryType === 'erp_import_run');
   }
   async function loadAll() {
@@ -109,6 +114,13 @@
     await loadAll();
     return payload.id || id;
   }
+  async function nextCounter(counterKey) {
+    const payload = await request(`/counters/${encodeURIComponent(counterKey)}/next`, {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    return Number(payload.value || 0);
+  }
   async function logStatusChange(recordType, recordId, action, details, extraFields) {
     await createRecord('status_log', {
       ...(extraFields || {}),
@@ -121,6 +133,6 @@
 
   window.PXApiClient = {
     enabled, loadAll, applySnapshot,
-    createRecord, updateRecord, archiveRecord, restoreRecord, logStatusChange
+    createRecord, updateRecord, archiveRecord, restoreRecord, nextCounter, logStatusChange
   };
 })();

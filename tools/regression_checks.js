@@ -218,6 +218,7 @@ check('shipmentSequence still parses legacy letter suffixes',
 const paymentsRender = read('src/modules/payments/payments.render.js');
 const shipmentsForm = read('src/modules/shipments/shipments.form.js');
 const paymentsForm = read('src/modules/payments/payments.form.js');
+const paymentsServiceSource = read('src/modules/payments/payments.service.js');
 const shipmentProcessedBlock = shipmentsForm.slice(
   shipmentsForm.indexOf("followupActionStatus: 'processed'"),
   shipmentsForm.indexOf("toast('Shipment created and linked", shipmentsForm.indexOf("followupActionStatus: 'processed'"))
@@ -240,6 +241,10 @@ check('payment render inline status toggles do not use expectedUpdatedAt',
   !paymentsRender.includes('expectedUpdatedAt'));
 check('payment approval updates use the requested permission action',
   /updateRecord\('payment_requests',\s*id,\s*patch,\s*\{\s*skipValidation:\s*true,\s*permissionAction:\s*neededSave\s*\}\)/.test(paymentsRender));
+check('payment RFP numbering uses API-mode SQL counter',
+  paymentsServiceSource.includes('window.__usesApiDataMode')
+  && paymentsServiceSource.includes('window.PXApiClient.nextCounter')
+  && paymentsServiceSource.indexOf('window.__usesApiDataMode') < paymentsServiceSource.indexOf('runTransaction(db'));
 
 // --- Firestore rule drift checks ---
 const authRules = read('docs/FIRESTORE_RULES/firestore.rules.authenticated');
@@ -827,7 +832,10 @@ check('My Work hides processed follow-up', myWork && myWork.actionCount === 0);
 const indexSource = read('index.html');
 const buildSource = read('build.py');
 const coreSource = read('src/core.js');
+const styleSource = read('styles/main.css');
 const apiClientSource = read('src/apiClient.js');
+const reportsServiceSource = read('src/modules/reports/reports.service.js');
+const reportsRenderSource = read('src/modules/reports/reports.render.js');
 const packageSource = read('tools/package.py');
 const managementControlsSource = read('src/modules/reports/managementControls.js');
 const dailyControlSource = read('src/modules/reports/dailyControlRoom.js');
@@ -857,12 +865,37 @@ check('Firebase modules are lazy-loaded only outside API data mode',
   && coreSource.includes('await initFirebaseIfNeeded();')
   && coreSource.includes("import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js')"));
 
+check('Test-mode banner is shown only by demo-mode code',
+  styleSource.includes('.test-mode-banner')
+  && /\.test-mode-banner\s*\{[^}]*display:\s*none/.test(styleSource)
+  && coreSource.includes('function configureTestModeBanner')
+  && coreSource.includes("'DEMO MODE - sample data only'")
+  && coreSource.includes("demoMode ? 'flex' : 'none'")
+  && !indexSource.includes('prototype' + ' data only'));
+
 check('API client exposes operational record CRUD methods',
   apiClientSource.includes('window.PXApiClient')
   && apiClientSource.includes('loadAll')
   && apiClientSource.includes('createRecord')
   && apiClientSource.includes('archiveRecord')
-  && apiClientSource.includes('restoreRecord'));
+  && apiClientSource.includes('restoreRecord')
+  && apiClientSource.includes('nextCounter'));
+
+check('API client sends officer attribution header',
+  apiClientSource.includes("x-phoenix-user")
+  && apiClientSource.includes('state.officer')
+  && apiClientSource.includes('officer.code'));
+
+check('Backup helpers use loaded API-mode state instead of Firestore reads',
+  reportsServiceSource.includes('window.__usesApiDataMode')
+  && reportsServiceSource.includes('state.data.statusLog')
+  && reportsServiceSource.includes('state.data.systemConfig'));
+
+check('Sample ERP helper is demo-mode gated',
+  reportsRenderSource.includes('const demoMode = !!(window.__isDemoMode')
+  && reportsRenderSource.includes("demoMode ? '<button class=\"btn\" id=\"erp-demo-btn\"")
+  && reportsRenderSource.includes("const demoBtn = $('#erp-demo-btn');")
+  && reportsRenderSource.includes('if (demoBtn) demoBtn.addEventListener'));
 
 dailyViews.forEach(view => {
   check(`Operational cadence view ${view} has nav, section, renderer and breadcrumb`,

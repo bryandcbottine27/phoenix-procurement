@@ -154,6 +154,8 @@ Backend v1 scaffold:
   store used by browser API mode for orders, shipments, payment requests, documents,
   follow-ups, issues, update requests, contact logs, KPI snapshots, status logs, and
   system configuration.
+- `backend/db/005_app_counters.sql` adds SQL-backed generated-reference counters
+  used by API mode, starting with RFP numbering.
 - SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
 - Phoenix-owned operational state is represented separately from ERP/provenance columns so the sync upsert can preserve it.
 - `backend/src/sources/dwSource.ts` reads fixture purchase orders, normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape, and applies backend classification.
@@ -169,8 +171,12 @@ Backend v1 scaffold:
 - `backend/src/functions/orderAlertNotifications.ts` registers a disabled-by-default timer and a function-key preview endpoint for order-level requested-receipt/stale-sync notifications with repeat suppression.
 - `backend/src/functions/records.ts` exposes function-key protected operational
   record routes for internal browser API mode.
+- `backend/src/functions/counters.ts` exposes function-key protected atomic
+  counters for generated references in internal browser API mode.
 - `backend/src/operational/records.ts` implements the operational record allowlist,
   JSON record mapping, soft archive/restore, and stale-write guard over SQL Server.
+- `backend/src/operational/counters.ts` validates counter keys and increments
+  `dbo.app_counters` with parameterized SQL.
 - `backend/src/analytics/cycleTime.ts` computes order-only cycle and bottleneck metrics from SQL orders, grouped by officer, supplier, category, and function.
 - `backend/src/analytics/otifRisk.ts` scores open orders that are not yet requested-receipt overdue using order-only signals such as near-due requested receipt, stale sync, long-open age, and missing classification.
 - `backend/src/worklists/unclassified.ts` lists `sync_exceptions` rows for unclassified, unmapped-supplier, and currency-ambiguous worklists and emits suggested actions for the future admin UI.
@@ -186,6 +192,8 @@ Backend v1 scaffold:
 - `backend/test/otifRisk.test.ts` and optional `backend/test/otifRisk.integration.test.ts` guard F4 scoring, coverage metadata, no-write query structure, and live SQL early-warning selection when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/unclassifiedWorklist.test.ts` and optional `backend/test/unclassifiedWorklist.integration.test.ts` guard F5 allowlists, mapping, summaries, suggested actions, no-write query structure, and live SQL worklist selection when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/operationalRecords.test.ts` and optional `backend/test/operationalRecords.integration.test.ts` guard the API-mode operational record allowlist, CRUD, stale-write handling, archive, and restore paths.
+- The same operational-record test files also guard API-mode counter key validation
+  and live SQL counter increments.
 - `backend/src/sql/client.ts` exposes `queryParams(sqlText, params)` and transaction-bound execution for parameterized SQL upserts.
 - `docs/BACKEND_HANDOFF.md` is the current backend gate handoff and sequencing source.
 
@@ -291,6 +299,8 @@ Current backend HTTP API scaffold:
 - `GET /api/worklists/unclassified` in `backend/src/functions/unclassifiedWorklist.ts`, function-auth, returns actionable sync exception worklist rows for future admin remediation screens.
 - `GET /api/notifications/order-alerts/preview` in `backend/src/functions/orderAlertNotifications.ts`, function-auth, returns a dry-run summary of order alert digests without Graph delivery or sent-state writes.
 - `GET /api/records`, `GET/POST /api/records/{collection}`, `PATCH /api/records/{collection}/{id}`, `POST /api/records/{collection}/{id}/archive`, and `POST /api/records/{collection}/{id}/restore` in `backend/src/functions/records.ts`, function-auth, provide the internal browser operational store.
+- `POST /api/counters/{counterKey}/next` in `backend/src/functions/counters.ts`,
+  function-auth, provides atomic generated-reference counters for API mode.
 - `POST /api/sync/purchase-orders` in `backend/src/functions/syncPurchaseOrders.ts`, function-auth, runs the fixture-backed purchase-order sync.
 
 In API data mode, the browser calls `/api/records` through `PXApiClient`. The other

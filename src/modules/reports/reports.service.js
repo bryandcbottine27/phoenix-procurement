@@ -43,6 +43,9 @@ function rowsToCSV(rows) {
 }
 
 async function fetchStatusLog() {
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    return Array.isArray(state.data.statusLog) ? state.data.statusLog : [];
+  }
   try {
     const snap = await getDocs(collection(db, 'status_log'));
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -50,6 +53,9 @@ async function fetchStatusLog() {
 }
 
 async function fetchSystemConfig() {
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    return Array.isArray(state.data.systemConfig) ? state.data.systemConfig : [];
+  }
   try {
     const snap = await getDocs(collection(db, 'system_config'));
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));

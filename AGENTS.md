@@ -52,7 +52,7 @@ If the change touches fields or collections, read and update `src/schema.js`. Do
 - Do not create timestamped, `pre-*`, backup, duplicate-purpose, or extra package zip files in the project root.
 - Every package update/amendment must replace those two files only.
 - Demo package keeps the demo build (`dist/phoenix-procurement-DEMO.html`).
-- Production package keeps the production build (`dist/phoenix-procurement-PRODUCTION.html`) with `demoMode: false` and `authMode: 'password'`.
+- Production package keeps the production build (`dist/phoenix-procurement-PRODUCTION.html`) with `demoMode: false`, `authMode: 'internal'`, and `dataMode: 'api'` unless a future documented IT decision changes it.
 - Use `python tools/package.py` to refresh both zips after a green `python build.py`.
 - Both zips are full snapshots and intentionally include `backend/` source. They must not include `node_modules/`, `backend/dist/`, `backend/local.settings.json`, secret/key files, `.git/`, or local scratchpad artifacts.
 - Use Git commits/tags for history instead of accumulating package backup zips.
@@ -63,7 +63,7 @@ If the change touches fields or collections, read and update `src/schema.js`. Do
 - Do not call Firestore `addDoc`, `updateDoc`, `setDoc`, `deleteDoc`, or `runTransaction` directly for normal business CRUD.
 - Known direct-write exceptions:
   - officer profile bootstrap in `src/core.js`
-  - atomic RFP counter transaction in `src/modules/payments/payments.service.js`
+  - RFP reference counter in `src/modules/payments/payments.service.js` (Firestore transaction in demo/Firebase mode; backend SQL counter in API mode)
   - demo-only admin purge in `src/modules/reports/erpImport.js`
   - `PXStore` internals
 - Use soft archive/restore for business records.
@@ -95,9 +95,9 @@ Do not reverse confirmed rules without explicit user approval. In particular:
 ## Authentication and permissions
 
 - Demo mode may use anonymous/demo role switching.
-- Production mode must use individual credentials and ignore demo role overrides.
+- Production/API mode must ignore demo role overrides. The current `authMode: 'internal'` local operator setup is for closed-environment testing only; pilot/go-live needs the IT-approved individual identity or gateway policy.
 - `REF.permissions`, `REF.viewAccess`, `PXUtils.can`, `PXPermissions`, and `PXStore` write checks must stay aligned.
-- Production requires Firestore rules. Browser checks alone are not sufficient.
+- Production requires server-side authorization. In API mode this belongs at the internal gateway/backend layer; if Firebase is reselected, Firestore rules must enforce the same matrix. Browser checks alone are not sufficient.
 - Access-sensitive changes need role-by-role testing, especially payments, update requests, order edit, shipment edit, and System Settings.
 
 ## Documentation requirements

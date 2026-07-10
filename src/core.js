@@ -42,6 +42,14 @@ function usesApiDataMode() {
 function isDemoMode() { return !!(window.APP_CONFIG && window.APP_CONFIG.demoMode); }
 window.__isDemoMode = isDemoMode;
 window.__usesApiDataMode = usesApiDataMode;
+function configureTestModeBanner() {
+  const banner = document.getElementById('test-mode-banner');
+  const text = document.getElementById('test-mode-banner-text');
+  const demoMode = isDemoMode();
+  if (text) text.textContent = demoMode ? 'DEMO MODE - sample data only' : '';
+  if (banner) banner.style.display = demoMode ? 'flex' : 'none';
+}
+configureTestModeBanner();
 function usesPasswordAuth() {
   if (usesApiDataMode()) return window.APP_CONFIG && window.APP_CONFIG.authMode === 'password';
   return (window.APP_CONFIG && window.APP_CONFIG.authMode === 'password') || !isDemoMode();
@@ -1217,6 +1225,8 @@ const state = {
     importRules: [],
     businessCalendars: [],
     importRuns: [],
+    statusLog: [],
+    systemConfig: [],
     documents: [],
     followups: [],
     issues: [],
@@ -2183,6 +2193,10 @@ function subscribeAll() {
   state.unsubs.push(onSnapshot(query(collection(db, 'system_config'), where('configKey', '==', 'erp_import_rules')),
     snap => {
       const configs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.data.systemConfig = [
+        ...(state.data.systemConfig || []).filter(item => item.configKey !== 'erp_import_rules'),
+        ...configs
+      ];
       const config = configs[0] || null;
       state.importRuleConfigId = config ? config.id : null;
       state.data.importRules = config && Array.isArray(config.rules) ? config.rules : [];
@@ -2193,6 +2207,10 @@ function subscribeAll() {
   state.unsubs.push(onSnapshot(query(collection(db, 'system_config'), where('configKey', '==', 'business_calendars')),
     snap => {
       const configs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.data.systemConfig = [
+        ...(state.data.systemConfig || []).filter(item => item.configKey !== 'business_calendars'),
+        ...configs
+      ];
       const config = configs[0] || null;
       state.calendarConfigId = config ? config.id : null;
       state.data.businessCalendars = config && Array.isArray(config.calendars) ? config.calendars : [];
@@ -2203,11 +2221,12 @@ function subscribeAll() {
 
   state.unsubs.push(onSnapshot(query(collection(db, 'status_log'), orderBy('at', 'desc'), limit(100)),
     snap => {
-      state.data.importRuns = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(entry => entry.entryType === 'erp_import_run');
+      state.data.statusLog = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.data.importRuns = state.data.statusLog.filter(entry => entry.entryType === 'erp_import_run');
       const importPreviewOpen = state.view === 'erprecon' && $('#erp-import-panel')?.childElementCount;
       if (state.view === 'erprecon' && !importPreviewOpen) renderView('erprecon');
     },
-    err => console.error('ERP import history sub error', err)));
+    err => { state.data.statusLog = []; state.data.importRuns = []; console.error('ERP import history sub error', err); }));
 
   // ---- Phoenix-owned operational collections (documents, follow-ups, issues) ----
   state.unsubs.push(onSnapshot(collection(db, 'documents'),

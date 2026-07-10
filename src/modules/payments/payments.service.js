@@ -13,6 +13,13 @@ async function nextRfpRef(entityCode) {
   const year = new Date().getFullYear();
   const meta = entityMeta(entityCode || currentEntity());
   const prefix = meta.rfpPrefix || 'PHX';
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    if (!window.PXApiClient || !window.PXApiClient.nextCounter) {
+      throw new Error('Internal API counter service is not available.');
+    }
+    const next = await window.PXApiClient.nextCounter(`rfp:${meta.code}:${prefix}:${year}`);
+    return `${prefix}/${year}/IMP/${String(next).padStart(3, '0')}`;
+  }
   // Per-entity counter so each company has its own sequence
   const counterRef = doc(db, 'system_config', `rfp_counter_${prefix}_${year}`);
   return await runTransaction(db, async tx => {
