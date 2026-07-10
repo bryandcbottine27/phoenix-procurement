@@ -303,8 +303,9 @@ F2 implementation status:
 - Recipient routing is environment-driven through
   `ORDER_ALERT_RECIPIENT_MAP_JSON` and `ORDER_ALERT_FALLBACK_EMAIL`; Graph
   secrets must come from app settings or Key Vault.
-- F2 writes no SQL sent-state yet, so repeated digest suppression remains a
-  future design decision.
+- `backend/db/003_notification_state.sql` adds SQL sent-state, and F2 records
+  sent digest items after successful email delivery so repeated items are
+  suppressed for `ORDER_ALERTS_REPEAT_SUPPRESSION_HOURS` (24 hours by default).
 - Covered by `backend/test/orderAlerts.test.ts` and optional live SQL coverage
   in `backend/test/orderAlerts.integration.test.ts`.
 

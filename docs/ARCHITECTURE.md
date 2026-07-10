@@ -156,18 +156,18 @@ Backend v1 scaffold:
 - `backend/src/functions/cycleTimeAnalytics.ts` exposes read-only `GET /api/analytics/cycle-time` with order-age bottleneck analytics and explicit coverage limits for unavailable workflow time-in-stage history.
 - `backend/src/functions/otifRisk.ts` exposes read-only `GET /api/analytics/otif-risk` with an order-only early-warning proxy and explicit coverage limits for unavailable supplier/shipment/GRN history.
 - `backend/src/functions/unclassifiedWorklist.ts` exposes read-only `GET /api/worklists/unclassified` for actionable sync exception rows.
-- `backend/src/functions/orderAlertNotifications.ts` registers a disabled-by-default timer and a function-key preview endpoint for order-level requested-receipt/stale-sync notifications.
+- `backend/src/functions/orderAlertNotifications.ts` registers a disabled-by-default timer and a function-key preview endpoint for order-level requested-receipt/stale-sync notifications with repeat suppression.
 - `backend/src/analytics/cycleTime.ts` computes order-only cycle and bottleneck metrics from SQL orders, grouped by officer, supplier, category, and function.
 - `backend/src/analytics/otifRisk.ts` scores open orders that are not yet requested-receipt overdue using order-only signals such as near-due requested receipt, stale sync, long-open age, and missing classification.
 - `backend/src/worklists/unclassified.ts` lists `sync_exceptions` rows for unclassified, unmapped-supplier, and currency-ambiguous worklists and emits suggested actions for the future admin UI.
 - `backend/src/kpi/queries.ts` and `backend/src/kpi/shape.ts` contain the first read-side query/mapping layer. The order mapper omits `phoenix_data` and labels SQL `status` as `initialOperationalStatus`. KPI shape helpers include explicit coverage metadata for excluded shipment/payment/GRN-derived metrics.
-- `backend/src/notifications/orderAlerts.ts` builds read-only notification digests from SQL orders. `backend/src/notifications/graphClient.ts` contains the Microsoft Graph sendMail/Teams-channel adapter, configured only through environment/app settings.
+- `backend/src/notifications/orderAlerts.ts` builds notification digests from SQL orders and records sent items in `dbo.notification_state` only after successful email delivery. `backend/src/notifications/graphClient.ts` contains the Microsoft Graph sendMail/Teams-channel adapter, configured only through environment/app settings.
 - `backend/test/dwSource.test.ts` guards the backend field list against drift from `src/warehouseAdapter.js`.
 - `backend/test/classification.test.ts` guards baseline rule drift against `src/importRules.js` and exercises canonical Phoenix, Seychelles Breweries, and Edena classifier cases.
 - `backend/test/purchaseOrderSync.test.ts` guards grouping, initial status seeding, sync exception queueing, parameterized SQL shape, and the update-time ownership boundary.
 - `backend/test/ordersRead.test.ts` and optional `backend/test/ordersRead.integration.test.ts` guard the F1a order-list endpoint, including sort injection rejection, pagination, read-only SQL shape, and live SQL pagination when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/kpisRead.test.ts` and optional `backend/test/kpisRead.integration.test.ts` guard the F1b KPI endpoint, including multi-currency spend buckets, MTTO, ageing, requested-receipt proxy handling, data-quality counts, coverage metadata, and read-only live SQL behaviour.
-- `backend/test/orderAlerts.test.ts` and optional `backend/test/orderAlerts.integration.test.ts` guard F2 recipient routing, dry-run delivery, no-write query structure, and live SQL alert selection when `RUN_SQL_INTEGRATION=true`.
+- `backend/test/orderAlerts.test.ts` and optional `backend/test/orderAlerts.integration.test.ts` guard F2 recipient routing, dry-run delivery, parameterized notification-state writes, repeat suppression, and live SQL alert selection when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/cycleTime.test.ts` and optional `backend/test/cycleTime.integration.test.ts` guard F3 threshold validation, no-write query structure, order-age/requested-receipt bottleneck metrics, and live SQL cycle analytics when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/otifRisk.test.ts` and optional `backend/test/otifRisk.integration.test.ts` guard F4 scoring, coverage metadata, no-write query structure, and live SQL early-warning selection when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/unclassifiedWorklist.test.ts` and optional `backend/test/unclassifiedWorklist.integration.test.ts` guard F5 allowlists, mapping, summaries, suggested actions, no-write query structure, and live SQL worklist selection when `RUN_SQL_INTEGRATION=true`.
@@ -258,7 +258,7 @@ Current backend HTTP API scaffold:
 - `GET /api/analytics/cycle-time` in `backend/src/functions/cycleTimeAnalytics.ts`, function-auth, returns order-only cycle/bottleneck analytics with an explicit workflow-history coverage block.
 - `GET /api/analytics/otif-risk` in `backend/src/functions/otifRisk.ts`, function-auth, returns an order-only OTIF early-warning proxy with explicit supplier/shipment/GRN coverage exclusions.
 - `GET /api/worklists/unclassified` in `backend/src/functions/unclassifiedWorklist.ts`, function-auth, returns actionable sync exception worklist rows for future admin remediation screens.
-- `GET /api/notifications/order-alerts/preview` in `backend/src/functions/orderAlertNotifications.ts`, function-auth, returns a dry-run summary of order alert digests without Graph delivery.
+- `GET /api/notifications/order-alerts/preview` in `backend/src/functions/orderAlertNotifications.ts`, function-auth, returns a dry-run summary of order alert digests without Graph delivery or sent-state writes.
 - `POST /api/sync/purchase-orders` in `backend/src/functions/syncPurchaseOrders.ts`, function-auth, runs the fixture-backed purchase-order sync.
 
 No browser screen currently calls this backend API.

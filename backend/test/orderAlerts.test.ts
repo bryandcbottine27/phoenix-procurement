@@ -5,6 +5,7 @@ import type { SqlParams, SqlQueryExecutor } from "../src/sql/client";
 import {
   buildAlertDigests,
   fetchOrderAlerts,
+  notificationAlertKey,
   OrderAlertRow,
   OrderAlertSettings,
   parseRecipientMap,
@@ -127,12 +128,16 @@ test("runOrderAlertNotifications supports disabled and dry-run preview modes wit
     async sendMail() {
       throw new Error("dry-run must not send mail");
     }
-  }, queryReturning(sampleAlerts));
+  }, queryReturning(sampleAlerts, (text) => {
+    assert.doesNotMatch(text, /\bMERGE\s+dbo\.notification_state\b/i);
+  }));
   assert.equal(dryRun.enabled, true);
   assert.equal(dryRun.dryRun, true);
   assert.equal(dryRun.sentEmails, 0);
   assert.equal(dryRun.matched, 2);
   assert.equal(dryRun.unmatched, 0);
+  assert.equal(dryRun.suppressed, 0);
+  assert.equal(dryRun.eligible, 2);
 });
 
 test("runOrderAlertNotifications sends email and optional Teams summary when enabled", async () => {
@@ -157,4 +162,51 @@ test("runOrderAlertNotifications sends email and optional Teams summary when ena
   assert.equal(teamsPosted, 1);
   assert.equal(resultValue.sentEmails, 2);
   assert.equal(resultValue.postedTeamsMessages, 1);
+});
+
+test("runOrderAlertNotifications suppresses recently sent alerts and records newly sent state", async () => {
+  const suppressedKey = notificationAlertKey(sampleAlerts[0], "technical@example.com");
+  const sentBodies: string[] = [];
+  const calls: { sqlText: string; params: SqlParams }[] = [];
+  const query: SqlQueryExecutor = async <T = unknown>(sqlText: string, params: SqlParams = {}) => {
+    calls.push({ sqlText, params });
+    if (/FROM dbo\.orders/i.test(sqlText)) return result(sampleAlerts as unknown as T[]);
+    if (/FROM dbo\.notification_state/i.test(sqlText)) return result([{ alertKey: suppressedKey }] as unknown as T[]);
+    return result([] as unknown as T[]);
+  };
+
+  const resultValue = await runOrderAlertNotifications(
+    { ...baseSettings, dryRun: false },
+    {
+      async sendMail(message) {
+        sentBodies.push(message.bodyText);
+      }
+    },
+    query
+  );
+
+  assert.equal(resultValue.fetched, 2);
+  assert.equal(resultValue.matched, 2);
+  assert.equal(resultValue.suppressed, 1);
+  assert.equal(resultValue.eligible, 1);
+  assert.equal(resultValue.sentEmails, 1);
+  assert.equal(resultValue.digests.length, 1);
+  assert.equal(resultValue.digests[0].to, "phoenix@example.com");
+  assert.equal(resultValue.digests[0].count, 1);
+  assert.equal(sentBodies.length, 1);
+  assert.doesNotMatch(sentBodies[0], /FPO100/);
+  assert.match(sentBodies[0], /FPO101/);
+
+  const stateSelect = calls.find(call => /FROM dbo\.notification_state/i.test(call.sqlText));
+  assert.ok(stateSelect);
+  assert.deepEqual((stateSelect.params.suppression_hours as { value: number }).value, 24);
+  assert.equal((stateSelect.params.alert_key_0 as { value: string }).value.length, 64);
+  assert.equal((stateSelect.params.alert_key_1 as { value: string }).value.length, 64);
+
+  const mergeCalls = calls.filter(call => /MERGE dbo\.notification_state/i.test(call.sqlText));
+  assert.equal(mergeCalls.length, 1);
+  assert.doesNotMatch(mergeCalls[0].sqlText, /FPO101|Supplier B|phoenix@example\.com/);
+  assert.equal((mergeCalls[0].params.alert_key as { value: string }).value.length, 64);
+  assert.equal((mergeCalls[0].params.order_id as { value: string }).value, "FPO101");
+  assert.equal((mergeCalls[0].params.recipient_email as { value: string }).value, "phoenix@example.com");
 });

@@ -9,6 +9,10 @@ const entity = "F2 Entity";
 const prefix = "F2-";
 
 async function cleanup(): Promise<void> {
+  await queryParams("DELETE FROM dbo.notification_state WHERE entity = @entity OR order_id LIKE @prefix;", {
+    entity: typedParam(sql.NVarChar(120), entity),
+    prefix: typedParam(sql.NVarChar(120), `${prefix}%`)
+  });
   await queryParams("DELETE FROM dbo.orders WHERE entity = @entity OR order_id LIKE @prefix;", {
     entity: typedParam(sql.NVarChar(120), entity),
     prefix: typedParam(sql.NVarChar(120), `${prefix}%`)
@@ -87,6 +91,42 @@ test("F2 order alerts query finds overdue, approaching, and stale open orders", 
     });
     assert.ok(result.fetched >= 3);
     assert.ok(result.digests.some(digest => digest.to === "f2@example.com" && digest.count >= 3));
+
+    let sentEmails = 0;
+    const firstSend = await runOrderAlertNotifications({
+      enabled: true,
+      dryRun: false,
+      approachingDays: 7,
+      staleSyncDays: 3,
+      recipientMap: {
+        f2officer: { email: "f2@example.com", label: "F2 officer" }
+      }
+    }, {
+      async sendMail() {
+        sentEmails += 1;
+      }
+    });
+    assert.equal(firstSend.sentEmails, 1);
+    assert.ok(firstSend.eligible >= 3);
+    assert.equal(sentEmails, 1);
+
+    const secondSend = await runOrderAlertNotifications({
+      enabled: true,
+      dryRun: false,
+      approachingDays: 7,
+      staleSyncDays: 3,
+      recipientMap: {
+        f2officer: { email: "f2@example.com", label: "F2 officer" }
+      }
+    }, {
+      async sendMail() {
+        sentEmails += 1;
+      }
+    });
+    assert.equal(secondSend.sentEmails, 0);
+    assert.equal(secondSend.eligible, 0);
+    assert.ok(secondSend.suppressed >= 3);
+    assert.equal(sentEmails, 1);
   } finally {
     await cleanup();
     await closeSqlPool();

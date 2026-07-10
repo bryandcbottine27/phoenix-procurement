@@ -309,10 +309,14 @@ design is approved.
 aggregations: entity/date, function, order type, ERP PO status, requested
 receipt exposure, open sync exceptions, and latest import audit lookup.
 
+`db/003_notification_state.sql` adds the F2 notification sent-state table used
+to suppress repeated order-alert digest items between timer runs.
+
 ## Order Alert Notifications
 
 F2 adds order-level notification scaffolding for responsible officers. The timer
-is disabled by default and reads SQL only. It looks for:
+is disabled by default, reads SQL order data, and writes only notification
+sent-state after successful delivery. It looks for:
 
 - open orders with `requested_receipt_date` already overdue;
 - open orders with `requested_receipt_date` approaching within
@@ -332,6 +336,9 @@ Timer settings:
 - `ORDER_ALERTS_DRY_RUN=true` runs the query and builds digests without Graph
   delivery.
 - `ORDER_ALERTS_CRON` overrides the default `0 0 4 * * *` schedule.
+- `ORDER_ALERTS_REPEAT_SUPPRESSION_HOURS=24` suppresses digest items already
+  recorded as sent in SQL during the last 24 hours. Set a different positive
+  integer for a shorter or longer repeat window.
 - `ORDER_ALERT_RECIPIENT_MAP_JSON` maps officer keys to email targets. Keys are
   checked in this order: `erp_purchaser_code`, `erp_created_by`, `claimant`,
   `procurement_function`, `entity`, `default`.
@@ -358,8 +365,10 @@ from committed files:
 - optional `GRAPH_TEAMS_TEAM_ID` and `GRAPH_TEAMS_CHANNEL_ID` for a Teams channel
   summary.
 
-Until a notification/audit table is approved, F2 does not write sent-state to
-SQL and therefore does not suppress repeated digest items between timer runs.
+After a real email digest is sent, each alert item is upserted into
+`dbo.notification_state`. Later timer runs suppress matching
+recipient/type/entity/order alert keys inside the configured repeat window.
+The preview endpoint and dry-run mode do not write notification state.
 
 ## Docker SQL Server Example
 
