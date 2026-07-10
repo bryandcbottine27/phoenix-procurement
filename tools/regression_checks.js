@@ -864,6 +864,17 @@ check('Management pack exposes executive summary export helpers',
   && managementControlsSource.includes('function managementPackExportRows')
   && managementControlsSource.includes('managementPackSummary, managementPackExportRows'));
 
+check('Management pack exposes KPI target variance and operating checklist builders',
+  managementControlsSource.includes('function buildKpiTargetVariance')
+  && managementControlsSource.includes('function buildOperatingChecklist')
+  && managementControlsSource.includes('buildKpiTargetVariance, buildOperatingChecklist')
+  && managementControlsSource.includes('KPI Target Variance'));
+
+check('Daily Control Room renders and exports operating checklist rows',
+  dailyControlSource.includes('buildOperatingChecklist')
+  && dailyControlSource.includes('Operating checklist')
+  && dailyControlSource.includes("row.cadence + ' checklist'"));
+
 console.log();
 if (failures.length) {
   console.error(`REGRESSION CHECK FAILED (${failures.length} issue(s)):`);

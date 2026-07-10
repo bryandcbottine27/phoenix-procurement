@@ -178,8 +178,10 @@ Browser operating cadence views:
 
 - `src/modules/reports/dailyControlRoom.js` composes existing browser engines into read-only Daily Control Room, Supplier Chase Plan, and Exception Workbench views.
 - Daily Control Room reuses `PXManagementControls`, `PXProcFollowup`, and `__myWorkCompute` to provide a daily, weekly, and monthly operating cadence without creating new records.
+- Daily Control Room also renders a read-only operating checklist that combines current control signals, target posture, owners, and drill-through actions for daily/weekly/monthly routines.
 - Supplier Chase Plan groups open supplier acknowledgement, promise, response, cadence, and delivery-recovery actions by supplier and order.
 - Exception Workbench surfaces Firestore-side classification, supplier mapping, ERP/DW, and import-history exceptions and links to existing supplier mapping, ERP reconciliation, import-rule, or order-detail remediation screens. It does not call the backend SQL worklist API yet.
+- Management Pack includes an executive summary plus KPI target-variance guardrails built from the same `PXManagementControls` and `PXKpi` data, and exports those rows with the pack.
 
 Planned backend/integration services:
 

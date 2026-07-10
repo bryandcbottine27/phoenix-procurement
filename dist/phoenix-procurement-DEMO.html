@@ -23630,6 +23630,111 @@ const REF = window.REF;
     if (window.__viewLevel && window.__viewLevel(view) === 'none') return '';
     return `<button class="mgmt-tile ${tone || 'neutral'}" onclick="navigate('${view}')"><span>${escapeHtml(label)}</span><strong>${value}</strong><small>${escapeHtml(sub)}</small></button>`;
   }
+  function formatMetricValue(value, unit) {
+    if (value === null || value === undefined || value === '') return '-';
+    if (unit === '%') return value + '%';
+    if (unit === 'days') return value + ' d';
+    return String(value);
+  }
+  function targetStatus(current, target, direction) {
+    if (current === null || current === undefined || current === '') {
+      return { status: 'No sample', cls: 'neutral', variance: null };
+    }
+    const value = Number(current);
+    if (!Number.isFinite(value)) return { status: 'No sample', cls: 'neutral', variance: null };
+    const variance = direction === 'min' ? value - target : target - value;
+    const ok = direction === 'min' ? value >= target : value <= target;
+    if (ok) return { status: 'On target', cls: 'success', variance };
+    return { status: 'Off target', cls: target === 0 ? 'danger' : 'warn', variance };
+  }
+  function targetRow(area, metric, current, target, direction, unit, owner, view, action) {
+    const result = targetStatus(current, target, direction);
+    return {
+      area,
+      metric,
+      current,
+      target,
+      direction,
+      unit: unit || '',
+      currentLabel: formatMetricValue(current, unit),
+      targetLabel: (direction === 'min' ? '>=' : '<=') + ' ' + formatMetricValue(target, unit),
+      varianceLabel: result.variance === null ? '-' : formatMetricValue(Math.abs(Number(result.variance.toFixed ? result.variance.toFixed(1) : result.variance)), unit),
+      status: result.status,
+      cls: result.cls,
+      owner: owner || 'Management',
+      view,
+      action: action || 'Review'
+    };
+  }
+
+  function buildKpiTargetVariance(ent) {
+    const data = buildManagementData(ent);
+    const kpi = window.PXKpi ? window.PXKpi.compute(ent) : {};
+    const paymentDays = row => row.daysUntil ?? daysUntil(row.forecastDate || row.dueDate);
+    const criticalExceptions = data.exceptions.filter(item => item.check.level === 'danger').length;
+    const highOtif = data.otifRisk.filter(row => row.score >= 75).length;
+    const clearanceRisk = data.clearance.filter(row => row.score >= 45).length;
+    const paymentOverdue = data.payments.rows.filter(row => paymentDays(row) < 0).length;
+    const weakSuppliers = data.scorecards.filter(score => score.rating < 60).length;
+    const officerPressure = data.workload.filter(row => row.critical || row.dueSoon || row.total >= 8).length;
+
+    return [
+      targetRow('Daily control', 'Critical exceptions', criticalExceptions, 0, 'max', '', 'Management', 'exceptions', 'Clear critical exceptions'),
+      targetRow('OTIF risk', 'High-risk active orders', highOtif, 0, 'max', '', 'Procurement', 'otifrisk', 'Expedite high-risk orders'),
+      targetRow('Logistics', 'Clearance-risk shipments', clearanceRisk, 0, 'max', '', 'Logistics', 'clearance', 'Resolve clearance blockers'),
+      targetRow('Finance', 'Overdue payment items', paymentOverdue, 0, 'max', '', 'Finance', 'paymentexposure', 'Review overdue payments'),
+      targetRow('Supplier', 'Weak supplier scorecards', weakSuppliers, 0, 'max', '', 'Procurement', 'scorecards', 'Review supplier recovery'),
+      targetRow('Workload', 'Officer pressure points', officerPressure, 0, 'max', '', 'Management', 'workload', 'Rebalance open workload'),
+      targetRow('KPI', 'OTIF actual', kpi.otifPct, 95, 'min', '%', 'Management', 'kpitrends', 'Review KPI trend'),
+      targetRow('KPI', 'MTTO average', kpi.mtto, 7, 'max', 'days', 'Procurement', 'kpitrends', 'Review procurement lead time'),
+      targetRow('KPI', 'Average clearance time', kpi.avgClearance, 3, 'max', 'days', 'Logistics', 'kpitrends', 'Review clearance process'),
+      targetRow('KPI', 'Shipment lateness average', kpi.avgLateness, 0, 'max', 'days', 'Logistics', 'kpitrends', 'Review late shipment drivers')
+    ];
+  }
+
+  function checklistRow(cadence, owner, control, count, target, view, action) {
+    const result = targetStatus(count, target, 'max');
+    return {
+      cadence,
+      owner,
+      control,
+      signal: count + (count === 1 ? ' item' : ' items'),
+      target: '<= ' + target,
+      status: result.status,
+      statusClass: result.cls,
+      view,
+      action
+    };
+  }
+
+  function buildOperatingChecklist(ent) {
+    const data = buildManagementData(ent);
+    const paymentDays = row => row.daysUntil ?? daysUntil(row.forecastDate || row.dueDate);
+    const criticalExceptions = data.exceptions.filter(item => item.check.level === 'danger').length;
+    const supplierChaseDue = data.exceptions.filter(item => /supplier|promise|follow.?up|acknowledg/i.test(item.check.msg || '')).length;
+    const clearanceRisk = data.clearance.filter(row => row.score >= 45).length;
+    const paymentOverdue = data.payments.rows.filter(row => paymentDays(row) < 0).length;
+    const paymentDue = data.payments.rows.filter(row => paymentDays(row) >= 0 && paymentDays(row) <= 7).length;
+    const officerPressure = data.workload.filter(row => row.critical || row.dueSoon || row.total >= 8).length;
+    const weakSuppliers = data.scorecards.filter(score => score.rating < 60).length;
+    const partialControls = data.partials.length;
+    const highOtif = data.otifRisk.filter(row => row.score >= 75).length;
+    const packRows = managementPackRows(ent).length;
+
+    return [
+      checklistRow('Daily', 'Management', 'Clear critical exceptions', criticalExceptions, 0, 'exceptions', 'Review exceptions'),
+      checklistRow('Daily', 'Logistics', 'Resolve clearance blockers', clearanceRisk, 0, 'clearance', 'Review clearance'),
+      checklistRow('Daily', 'Finance', 'Clear overdue payments', paymentOverdue, 0, 'paymentexposure', 'Review overdue payments'),
+      checklistRow('Daily', 'Procurement', 'Act on high OTIF risk', highOtif, 0, 'otifrisk', 'Review OTIF risk'),
+      checklistRow('Weekly', 'Procurement', 'Run supplier chase plan', supplierChaseDue, 0, 'supplierchase', 'Open chase plan'),
+      checklistRow('Weekly', 'Management', 'Rebalance officer pressure', officerPressure, 0, 'workload', 'Review workload'),
+      checklistRow('Weekly', 'Finance', 'Review payments due this week', paymentDue, 0, 'paymentexposure', 'Review due payments'),
+      checklistRow('Weekly', 'Logistics', 'Resolve partial shipment controls', partialControls, 0, 'partials', 'Review partial shipments'),
+      checklistRow('Monthly', 'Management', 'Export management pack', packRows, 0, 'managementpack', 'Export management pack'),
+      checklistRow('Monthly', 'Procurement', 'Review weak supplier scorecards', weakSuppliers, 0, 'scorecards', 'Open scorecards'),
+      checklistRow('Monthly', 'Management', 'Capture KPI trend snapshot', 0, 0, 'kpitrends', 'Open KPI Trends')
+    ];
+  }
 
   function renderManagementCockpit() {
     const viewEl = $('#view-mgmtcockpit');
@@ -23891,6 +23996,8 @@ const REF = window.REF;
     const partialControls = data.partials.length;
     const weakSuppliers = data.scorecards.filter(s => s.rating < 60).length;
     const officerPressure = data.workload.filter(r => r.critical || r.dueSoon || r.total >= 8).length;
+    const targetVariance = buildKpiTargetVariance(ent);
+    const offTargetControls = targetVariance.filter(row => row.status === 'Off target').length;
     const focusAreas = [];
     if (criticalExceptions) focusAreas.push('exceptions');
     if (highOtif) focusAreas.push('OTIF risk');
@@ -23899,6 +24006,7 @@ const REF = window.REF;
     if (partialControls) focusAreas.push('partial shipments');
     if (weakSuppliers) focusAreas.push('supplier reliability');
     if (officerPressure) focusAreas.push('officer workload');
+    if (offTargetControls) focusAreas.push('KPI target variance');
     return {
       entity: ent,
       generatedAt: new Date().toISOString(),
@@ -23912,6 +24020,7 @@ const REF = window.REF;
       partialControls,
       weakSuppliers,
       officerPressure,
+      offTargetControls,
       focusAreas,
       narrative: focusAreas.length
         ? `Management focus: ${focusAreas.join(', ')}.`
@@ -23928,6 +24037,17 @@ const REF = window.REF;
       { Section: 'Executive Summary', Priority: 'Clearance risk', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.clearanceRisk) },
       { Section: 'Executive Summary', Priority: 'Payment due <=7d', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.paymentDue) },
       { Section: 'Executive Summary', Priority: 'Officer pressure', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.officerPressure) },
+      { Section: 'Executive Summary', Priority: 'Off-target controls', Record: '', Supplier: '', Owner: '', Date: '', Amount: '', Detail: String(summary.offTargetControls) },
+      ...buildKpiTargetVariance(ent).map(row => ({
+        Section: 'KPI Target Variance',
+        Priority: row.status,
+        Record: row.metric,
+        Supplier: '',
+        Owner: row.owner,
+        Date: '',
+        Amount: row.currentLabel,
+        Detail: `Target ${row.targetLabel}; variance ${row.varianceLabel}; action ${row.action}`
+      })),
       ...managementPackRows(ent)
     ];
   }
@@ -23938,6 +24058,8 @@ const REF = window.REF;
     const ent = currentEntity();
     const rows = managementPackRows(ent);
     const summary = managementPackSummary(ent);
+    const targetRows = buildKpiTargetVariance(ent);
+    const offTargetRows = targetRows.filter(row => row.status === 'Off target');
     viewEl.innerHTML = `${pageHead('Monthly Management Pack', 'One-click control extract for weekly or monthly procurement/logistics review.', `<button class="btn btn-primary" id="pack-export">Export Pack CSV</button>`)}
       <div class="kpi-pill-row">
         <div class="kpi-pill"><div class="kpi-pill-label">Pack lines</div><div class="kpi-pill-value">${rows.length}</div></div>
@@ -23945,6 +24067,7 @@ const REF = window.REF;
         <div class="kpi-pill"><div class="kpi-pill-label">Critical exceptions</div><div class="kpi-pill-value">${summary.criticalExceptions}</div></div>
         <div class="kpi-pill"><div class="kpi-pill-label">High OTIF risk</div><div class="kpi-pill-value">${summary.highOtif}</div></div>
         <div class="kpi-pill"><div class="kpi-pill-label">Payments due</div><div class="kpi-pill-value">${summary.paymentDue}</div></div>
+        <div class="kpi-pill"><div class="kpi-pill-label">Off target</div><div class="kpi-pill-value">${offTargetRows.length}</div></div>
       </div>
       <div class="mgmt-band">
         <div class="mgmt-band-head"><div><h3>Executive summary</h3><span>Auto-generated operating focus for the current weekly/monthly pack.</span></div></div>
@@ -23954,8 +24077,13 @@ const REF = window.REF;
           `<tr><td>High OTIF risk</td><td class="num">${summary.highOtif}</td></tr>`,
           `<tr><td>Clearance risk</td><td class="num">${summary.clearanceRisk}</td></tr>`,
           `<tr><td>Payment due <= 7d</td><td class="num">${summary.paymentDue}</td></tr>`,
-          `<tr><td>Officer pressure</td><td class="num">${summary.officerPressure}</td></tr>`
+          `<tr><td>Officer pressure</td><td class="num">${summary.officerPressure}</td></tr>`,
+          `<tr><td>Off-target controls</td><td class="num">${summary.offTargetControls}</td></tr>`
         ], 'No summary signals.')}
+      </div>
+      <div class="mgmt-band">
+        <div class="mgmt-band-head"><div><h3>KPI target variance</h3><span>Draft operating guardrails for the current entity. Tune the targets once business owners approve final SLAs.</span></div><div class="mgmt-actions">${navButton('kpitrends', 'Open KPI Trends')}</div></div>
+        ${miniTable(['Status','Area','Metric','Current','Target','Variance','Owner','Action'], targetRows.map(row => `<tr ${row.view ? `onclick="navigate('${row.view}')" style="cursor:pointer"` : ''}><td>${badge(row.status, row.cls)}</td><td>${escapeHtml(row.area)}</td><td>${escapeHtml(row.metric)}</td><td class="num">${escapeHtml(row.currentLabel)}</td><td class="num">${escapeHtml(row.targetLabel)}</td><td class="num">${escapeHtml(row.varianceLabel)}</td><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.action)}</td></tr>`), 'No target rows available.')}
       </div>
       ${miniTable(['Section','Priority','Record','Supplier','Owner','Date','Amount','Detail'], rows.slice(0, 120).map(r => `<tr><td>${escapeHtml(r.Section)}</td><td>${escapeHtml(r.Priority)}</td><td class="mono">${escapeHtml(r.Record)}</td><td>${escapeHtml(r.Supplier)}</td><td>${escapeHtml(r.Owner)}</td><td>${escapeHtml(r.Date)}</td><td>${escapeHtml(r.Amount)}</td><td>${escapeHtml(r.Detail)}</td></tr>`), 'No management-pack exceptions for this entity.')}`;
     $('#pack-export')?.addEventListener('click', () => exportRows(managementPackExportRows(ent), 'management-pack-' + ent));
@@ -23964,6 +24092,7 @@ const REF = window.REF;
   window.PXManagementControls = {
     buildExceptions, buildOtifRisk, buildOfficerWorkload, buildPartialShipments,
     buildClearanceRows, buildPaymentExposure, buildCalendar, buildManagementData,
+    buildKpiTargetVariance, buildOperatingChecklist,
     managementPackRows, managementPackSummary, managementPackExportRows
   };
   window.__renderers['mgmtcockpit'] = renderManagementCockpit;
@@ -24375,12 +24504,16 @@ const state = window.__state;
     const packSummary = window.PXManagementControls?.managementPackSummary
       ? window.PXManagementControls.managementPackSummary(ent)
       : null;
+    const checklist = window.PXManagementControls?.buildOperatingChecklist
+      ? window.PXManagementControls.buildOperatingChecklist(ent)
+      : [];
 
     const rowHtml = control.todayItems
       .sort((a, b) => (a.priority === 'Critical' ? -1 : 0) - (b.priority === 'Critical' ? -1 : 0))
       .slice(0, 40)
       .map(row => `<tr ${row.go ? `onclick="${row.go}" style="cursor:pointer"` : ''}><td>${badge(row.priority, row.priority === 'Critical' ? 'danger' : 'warn')}</td><td>${escapeHtml(row.area)}</td><td class="mono">${escapeHtml(row.ref)}</td><td>${escapeHtml(row.supplier)}</td><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.dueDate || '-')}</td><td>${escapeHtml(row.action)}</td></tr>`);
     const calendarRows = control.data.calendar.slice(0, 12).map(event => `<tr ${event.go ? `onclick="${event.go}" style="cursor:pointer"` : ''}><td>${fmtDate(event.date) || '-'}</td><td>${badge(String(event.days), event.level)}</td><td>${escapeHtml(event.type)}</td><td class="mono">${escapeHtml(event.label)}</td><td>${escapeHtml(event.owner || '-')}</td><td>${escapeHtml(event.detail || '-')}</td></tr>`);
+    const checklistRows = checklist.map(row => `<tr ${row.view ? `onclick="navigate('${row.view}')" style="cursor:pointer"` : ''}><td>${escapeHtml(row.cadence)}</td><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.control)}</td><td>${escapeHtml(row.signal)}</td><td>${escapeHtml(row.target)}</td><td>${badge(row.status, row.statusClass)}</td><td>${escapeHtml(row.action)}</td></tr>`);
     const cadenceRows = [
       ['Daily', 'Start with My Work and Daily Control Room.', `${workActions} personal action(s); ${criticalExceptions} critical exception(s).`, 'mywork'],
       ['Weekly', 'Run Supplier Chase Plan, Officer Workload and Payment Exposure.', `${supplierDue} supplier chase item(s); ${control.paymentDue.length} payment item(s) due within 7 days.`, 'supplierchase'],
@@ -24396,6 +24529,11 @@ const state = window.__state;
         <button class="mgmt-tile primary" onclick="navigate('paymentexposure')"><span>Payments due</span><strong>${control.paymentDue.length}</strong><small>${control.paymentOverdue.length} overdue</small></button>
         <button class="mgmt-tile neutral" onclick="navigate('clearance')"><span>Clearance risk</span><strong>${clearanceRisk}</strong><small>ETA, broker docs, owner</small></button>
         <button class="mgmt-tile danger" onclick="navigate('exceptionworkbench')"><span>Data remediation</span><strong>${exceptionWork}</strong><small>classification, mapping, import</small></button>
+      </div>
+
+      <div class="mgmt-band">
+        <div class="mgmt-band-head"><div><h3>Operating checklist</h3><span>Daily, weekly and monthly controls with current signals and target posture.</span></div><div class="mgmt-actions">${navButton('managementpack', 'Open Pack')} ${navButton('kpitrends', 'KPI Trends')}</div></div>
+        ${miniTable(['Cadence','Owner','Control','Signal','Target','Status','Action'], checklistRows, 'No operating checklist rows available.')}
       </div>
 
       <div class="mgmt-band">
@@ -24422,7 +24560,15 @@ const state = window.__state;
       Owner: row.owner,
       Date: row.dueDate,
       Action: row.action
-    })), 'daily-control-room-' + ent));
+    })).concat(checklist.map(row => ({
+      Priority: row.status,
+      Area: row.cadence + ' checklist',
+      Ref: row.control,
+      Supplier: '',
+      Owner: row.owner,
+      Date: '',
+      Action: `${row.signal}; target ${row.target}; ${row.action}`
+    }))), 'daily-control-room-' + ent));
   }
 
   function renderSupplierChase() {

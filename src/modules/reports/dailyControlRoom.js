@@ -384,12 +384,16 @@ const state = window.__state;
     const packSummary = window.PXManagementControls?.managementPackSummary
       ? window.PXManagementControls.managementPackSummary(ent)
       : null;
+    const checklist = window.PXManagementControls?.buildOperatingChecklist
+      ? window.PXManagementControls.buildOperatingChecklist(ent)
+      : [];
 
     const rowHtml = control.todayItems
       .sort((a, b) => (a.priority === 'Critical' ? -1 : 0) - (b.priority === 'Critical' ? -1 : 0))
       .slice(0, 40)
       .map(row => `<tr ${row.go ? `onclick="${row.go}" style="cursor:pointer"` : ''}><td>${badge(row.priority, row.priority === 'Critical' ? 'danger' : 'warn')}</td><td>${escapeHtml(row.area)}</td><td class="mono">${escapeHtml(row.ref)}</td><td>${escapeHtml(row.supplier)}</td><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.dueDate || '-')}</td><td>${escapeHtml(row.action)}</td></tr>`);
     const calendarRows = control.data.calendar.slice(0, 12).map(event => `<tr ${event.go ? `onclick="${event.go}" style="cursor:pointer"` : ''}><td>${fmtDate(event.date) || '-'}</td><td>${badge(String(event.days), event.level)}</td><td>${escapeHtml(event.type)}</td><td class="mono">${escapeHtml(event.label)}</td><td>${escapeHtml(event.owner || '-')}</td><td>${escapeHtml(event.detail || '-')}</td></tr>`);
+    const checklistRows = checklist.map(row => `<tr ${row.view ? `onclick="navigate('${row.view}')" style="cursor:pointer"` : ''}><td>${escapeHtml(row.cadence)}</td><td>${escapeHtml(row.owner)}</td><td>${escapeHtml(row.control)}</td><td>${escapeHtml(row.signal)}</td><td>${escapeHtml(row.target)}</td><td>${badge(row.status, row.statusClass)}</td><td>${escapeHtml(row.action)}</td></tr>`);
     const cadenceRows = [
       ['Daily', 'Start with My Work and Daily Control Room.', `${workActions} personal action(s); ${criticalExceptions} critical exception(s).`, 'mywork'],
       ['Weekly', 'Run Supplier Chase Plan, Officer Workload and Payment Exposure.', `${supplierDue} supplier chase item(s); ${control.paymentDue.length} payment item(s) due within 7 days.`, 'supplierchase'],
@@ -405,6 +409,11 @@ const state = window.__state;
         <button class="mgmt-tile primary" onclick="navigate('paymentexposure')"><span>Payments due</span><strong>${control.paymentDue.length}</strong><small>${control.paymentOverdue.length} overdue</small></button>
         <button class="mgmt-tile neutral" onclick="navigate('clearance')"><span>Clearance risk</span><strong>${clearanceRisk}</strong><small>ETA, broker docs, owner</small></button>
         <button class="mgmt-tile danger" onclick="navigate('exceptionworkbench')"><span>Data remediation</span><strong>${exceptionWork}</strong><small>classification, mapping, import</small></button>
+      </div>
+
+      <div class="mgmt-band">
+        <div class="mgmt-band-head"><div><h3>Operating checklist</h3><span>Daily, weekly and monthly controls with current signals and target posture.</span></div><div class="mgmt-actions">${navButton('managementpack', 'Open Pack')} ${navButton('kpitrends', 'KPI Trends')}</div></div>
+        ${miniTable(['Cadence','Owner','Control','Signal','Target','Status','Action'], checklistRows, 'No operating checklist rows available.')}
       </div>
 
       <div class="mgmt-band">
@@ -431,7 +440,15 @@ const state = window.__state;
       Owner: row.owner,
       Date: row.dueDate,
       Action: row.action
-    })), 'daily-control-room-' + ent));
+    })).concat(checklist.map(row => ({
+      Priority: row.status,
+      Area: row.cadence + ' checklist',
+      Ref: row.control,
+      Supplier: '',
+      Owner: row.owner,
+      Date: '',
+      Action: `${row.signal}; target ${row.target}; ${row.action}`
+    }))), 'daily-control-room-' + ent));
   }
 
   function renderSupplierChase() {

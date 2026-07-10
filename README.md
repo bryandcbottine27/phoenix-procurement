@@ -116,8 +116,9 @@ modules/
              erpImport.js — LIVE no-library XLSX reader + LIVE PO import engine
                             (PXXlsxReader, PXPoImport: grouped/validated/safe upsert),
                             legacy STATUS-log migration, and the demo-only data purge
-             dailyControlRoom.js — Daily Control Room, Supplier Chase Plan, and
-                            Exception Workbench over existing control engines
+             dailyControlRoom.js — Daily Control Room with operating checklist,
+                            Supplier Chase Plan, and Exception Workbench over
+                            existing control engines
 operational.js       Documents / Follow-ups / Issues (shared detail sections) + demo file upload
 warehouseAdapter.js  PXWarehouse — future Data Warehouse/staging integration contract
 erpAdapter.js        PhoenixERP compatibility facade; delegates future sync to PXWarehouse

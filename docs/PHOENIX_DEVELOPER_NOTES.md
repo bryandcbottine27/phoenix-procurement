@@ -1714,7 +1714,8 @@ once after the historical import to populate the trend from real dates.
 data. No new collection is created.
 
 - **Daily Control Room** (`dailycontrol`): operating cadence view for daily control queues, weekly
-  supplier/payment/workload routines, and monthly management-pack review.
+  supplier/payment/workload routines, monthly management-pack review, and a read-only operating
+  checklist that shows current signals, target posture, owners, and drill-through actions.
 - **Management Cockpit** (`mgmtcockpit`): control tower combining critical exceptions, high OTIF
   risks, clearance readiness risks, payment due/overdue exposure, and weak supplier reliability.
 - **Supplier Chase Plan** (`supplierchase`): supplier-grouped and order-level chase list covering
@@ -1735,8 +1736,8 @@ data. No new collection is created.
   ready dates, ETD/ETA, clearance dates, payment due dates, follow-up due dates, and update-request
   due dates.
 - **Management Pack** (`managementpack`): one-click CSV pack for weekly/monthly review, pulling the
-  major exception, risk, clearance, payment, partial-shipment, and supplier-reliability rows, with
-  an executive summary and summary export rows.
+  major exception, risk, clearance, payment, partial-shipment, supplier-reliability, and KPI
+  target-variance rows, with an executive summary and summary export rows.
 - **Exception Workbench** (`exceptionworkbench`): read-only remediation queue over classification,
   supplier mapping, ERP/DW and import-history exceptions, linking to existing supplier mapping,
   ERP reconciliation, import-rule, and order-detail screens. Backend SQL worklist write actions

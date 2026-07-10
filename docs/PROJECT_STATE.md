@@ -109,7 +109,8 @@ Reference, reports, and controls:
 - ERP Import Rules and Working Calendars under System Settings.
 - Reports & Export, Daily Control Room, Supplier Chase Plan, KPI Trends, OTIF Risk Forecast, Officer Workload, Operational Calendar, Management Pack, Exception Workbench, Exceptions, Data Quality, Supplier Scorecards.
 - Management Cockpit reorganized as a control entry point, with the Daily Control Room now acting as the operating cadence view for daily, weekly, and monthly routines.
-- Management Pack includes an executive summary and export rows for weekly/monthly review, not only detailed exception lines.
+- Daily Control Room includes a read-only operating checklist for daily, weekly, and monthly controls, with current signal counts, target posture, and drill-through actions.
+- Management Pack includes an executive summary, KPI target-variance rows, and export rows for weekly/monthly review, not only detailed exception lines.
 
 Document handling:
 
@@ -196,7 +197,7 @@ Last local validation during this handover pass:
 - Local role/security/import/Data Quality/My Work regression checks plus Daily Control Room/Supplier Chase/Exception Workbench structural checks: passed.
 - Localhost browser shell smoke of the modular source: passed for the new navigation entries and view containers with no console errors; full authenticated dashboard walkthrough was not performed from this session to avoid creating/submitting a new Firebase demo profile.
 - JavaScript syntax check for all 63 modules: passed.
-- Backend `pnpm test` with Docker SQL integration (`RUN_SQL_INTEGRATION=true`) passed: 48 pass, 0 skipped.
+- Backend `pnpm test` with Docker SQL integration (`RUN_SQL_INTEGRATION=true`) passed: 49 pass, 0 skipped.
 - Demo build output generated: `dist/phoenix-procurement-DEMO.html`.
 - Isolated staged production build with `demoMode: false` and `authMode: 'password'`: passed.
 - Demo and production zip packages refreshed with these handover docs included:
