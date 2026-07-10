@@ -16,6 +16,7 @@
   const { collection, doc, addDoc, updateDoc, serverTimestamp } = window.__fs;
   const stripUndefined = (window.PXUtils && window.PXUtils.stripUndefined) || (x => x);
   const state = window.__state;
+  const apiMode = () => window.PXApiClient && window.PXApiClient.enabled && window.PXApiClient.enabled();
 
   const who = () => (state.officer && state.officer.code) || (state.user && state.user.email) || 'unknown';
   const STATE_KEY_FOR_COLLECTION = {
@@ -95,6 +96,14 @@
       createdAt: serverTimestamp(), createdBy: who(),
       updatedAt: serverTimestamp(), updatedBy: who()
     });
+    if (apiMode()) {
+      const ref = await window.PXApiClient.createRecord(collectionName, payload);
+      if (opts.log) {
+        await logStatusChange(opts.log.recordType || collectionName, opts.log.recordId || ref.id,
+                              opts.log.action || 'created', opts.log.details || '');
+      }
+      return ref;
+    }
     const ref = await addDoc(collection(db, collectionName), payload);
     if (opts.log) {
       await logStatusChange(opts.log.recordType || collectionName, opts.log.recordId || ref.id,
@@ -141,6 +150,14 @@
       ...data,
       updatedAt: serverTimestamp(), updatedBy: who()
     });
+    if (apiMode()) {
+      const savedId = await window.PXApiClient.updateRecord(collectionName, id, payload, opts);
+      if (opts.log) {
+        await logStatusChange(opts.log.recordType || collectionName, id,
+                              opts.log.action || 'updated', opts.log.details || '');
+      }
+      return savedId;
+    }
     await updateDoc(doc(db, collectionName, id), payload);
     if (opts.log) {
       await logStatusChange(opts.log.recordType || collectionName, id,
@@ -152,6 +169,10 @@
   // Soft-delete (audit-safe). Used across all business records.
   async function archiveRecord(collectionName, id, reason) {
     assertWriteAllowed(collectionName, 'archive');
+    if (apiMode()) {
+      await window.PXApiClient.archiveRecord(collectionName, id, reason);
+      return id;
+    }
     await updateDoc(doc(db, collectionName, id), stripUndefined({
       archived: true, archivedAt: serverTimestamp(), archivedBy: who(),
       archiveReason: reason || null,
@@ -162,6 +183,10 @@
 
   async function restoreRecord(collectionName, id) {
     assertWriteAllowed(collectionName, 'restore');
+    if (apiMode()) {
+      await window.PXApiClient.restoreRecord(collectionName, id);
+      return id;
+    }
     await updateDoc(doc(db, collectionName, id), stripUndefined({
       archived: false, archivedAt: null, archiveReason: null,
       updatedAt: serverTimestamp(), updatedBy: who()
@@ -172,6 +197,14 @@
   // Append-only audit/status entry. Never throws into the caller's flow.
   async function logStatusChange(recordType, recordId, action, details, extraFields = {}) {
     try {
+      if (apiMode()) {
+        await window.PXApiClient.logStatusChange(recordType, recordId, action, details, {
+          ...extraFields,
+          officerCode: who(),
+          at: serverTimestamp()
+        });
+        return;
+      }
       await addDoc(collection(db, 'status_log'), stripUndefined({
         ...extraFields,
         entryType: recordType, refId: recordId,

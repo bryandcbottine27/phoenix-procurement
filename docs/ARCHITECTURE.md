@@ -1,6 +1,6 @@
 # Phoenix Procurement - Architecture
 
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-10
 
 ## Current technical stack
 
@@ -9,11 +9,12 @@ Last reviewed: 2026-07-06
 - CSS in `styles/main.css`.
 - HTML shell in `index.html`.
 - Generated single-file HTML build through `build.py`.
-- Firebase Web SDK loaded from Google CDN:
+- Firebase Web SDK loaded lazily from Google CDN when `APP_CONFIG.dataMode === 'firebase'`:
   - Firebase App
   - Firebase Auth
   - Cloud Firestore
-- Firestore is the current database.
+- Demo mode uses Firestore as the current database.
+- Production package generation now stages `APP_CONFIG.dataMode = 'api'`, which uses the internal SQL/API backend and does not load Firebase modules.
 - No npm package, bundler, TypeScript, or framework is used.
 - Python build tooling is used for concatenation, data dictionary generation, and invariant checks.
 - Node is used by `build.py` for JavaScript syntax checking and the dependency-free
@@ -51,12 +52,13 @@ The application uses a modular-but-global browser architecture. Each module is l
 
 Important globals:
 
-- `window.APP_CONFIG` - demo/production flags and Firebase config.
+- `window.APP_CONFIG` - demo/production flags, data mode, internal API settings, and Firebase config for demo mode.
 - `window.REF` - reference data, permissions, entities, statuses, document rules, ERP ownership.
 - `window.__state` - live state, filters, active view, active entity, loaded data, officer/user.
 - `window.__renderers` - view renderer registry.
 - `window.PXUtils` - shared formatting, navigation, permissions, entity helpers, list helpers, export helpers, etc.
-- `window.PXStore` - central Firestore write path.
+- `window.PXApiClient` - internal SQL/API adapter used only when `APP_CONFIG.dataMode === 'api'`.
+- `window.PXStore` - central write path; delegates to Firestore in demo mode and the internal API adapter in API mode.
 - `window.PXSchema` - declarative schema and data dictionary source.
 - `window.PXOwnership` - ERP/Phoenix field ownership.
 - `window.PXValidators` - validation layer.
@@ -84,13 +86,14 @@ List screens are progressively using:
 
 Major foundation modules:
 
-- `core.js` - Firebase setup, APP_CONFIG, REF, state, navigation, utility helpers, subscriptions.
+- `core.js` - APP_CONFIG, lazy Firebase/API data-mode setup, REF, state, navigation, utility helpers, subscriptions.
 - `schema.js` - data dictionary source.
 - `erpOwnership.js` - ownership rules and ERP field maps.
 - `workflows.js` - status transition rules.
 - `validators.js` - data validation.
 - `permissions.js` - record-aware permission helpers.
-- `firestoreStore.js` - central writes, validation, permissions, audit.
+- `apiClient.js` - inactive-by-default internal API snapshot/write adapter.
+- `firestoreStore.js` - central writes, validation, permissions, audit, and Firestore/API delegation.
 - `dataQuality.js` - record-health checks and working-day calculations.
 - `procurementFollowup.js` - risk scoring, ageing, commitment, chase, ERP/DW exception checks.
 - `documentService.js` - SharePoint-ready document folder metadata.
@@ -115,19 +118,22 @@ Major domain folders:
 
 ## Backend architecture
 
-The browser application remains independent of any custom backend and still uses
-Firebase directly for current operational data. A new isolated backend scaffold
-exists under `backend/` for the planned Data Warehouse connector.
+The browser application has two data modes:
 
-Current production services used by the browser:
+- `firebase`: the demo path, using Firebase Auth/Firestore directly.
+- `api`: the internal production package path, using the SQL/API backend through
+  `PXApiClient` and never loading Firebase modules.
+
+Current demo services used by the browser:
 
 - Firebase Authentication
 - Cloud Firestore
 
 Current browser behaviour:
 
-- Subscribes to Firestore collections with `onSnapshot`.
-- Writes through `PXStore`.
+- In Firebase/demo mode, subscribes to Firestore collections with `onSnapshot`.
+- In API/internal mode, loads and polls `/api/records` through `PXApiClient`.
+- Writes through `PXStore` in both modes.
 - Generates client-side reports, exports, and Excel/CSV artifacts.
 - Reads Excel imports in the browser as a manual staging feed.
 
@@ -144,6 +150,10 @@ Backend v1 scaffold:
 - `backend/db/002_kpi_indexes.sql` adds idempotent read indexes for order
   filters/KPIs, requested-receipt exposure, open sync exceptions, and latest
   import-audit lookup.
+- `backend/db/004_operational_records.sql` adds the generic SQL operational record
+  store used by browser API mode for orders, shipments, payment requests, documents,
+  follow-ups, issues, update requests, contact logs, KPI snapshots, status logs, and
+  system configuration.
 - SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
 - Phoenix-owned operational state is represented separately from ERP/provenance columns so the sync upsert can preserve it.
 - `backend/src/sources/dwSource.ts` reads fixture purchase orders, normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape, and applies backend classification.
@@ -157,6 +167,10 @@ Backend v1 scaffold:
 - `backend/src/functions/otifRisk.ts` exposes read-only `GET /api/analytics/otif-risk` with an order-only early-warning proxy and explicit coverage limits for unavailable supplier/shipment/GRN history.
 - `backend/src/functions/unclassifiedWorklist.ts` exposes read-only `GET /api/worklists/unclassified` for actionable sync exception rows.
 - `backend/src/functions/orderAlertNotifications.ts` registers a disabled-by-default timer and a function-key preview endpoint for order-level requested-receipt/stale-sync notifications with repeat suppression.
+- `backend/src/functions/records.ts` exposes function-key protected operational
+  record routes for internal browser API mode.
+- `backend/src/operational/records.ts` implements the operational record allowlist,
+  JSON record mapping, soft archive/restore, and stale-write guard over SQL Server.
 - `backend/src/analytics/cycleTime.ts` computes order-only cycle and bottleneck metrics from SQL orders, grouped by officer, supplier, category, and function.
 - `backend/src/analytics/otifRisk.ts` scores open orders that are not yet requested-receipt overdue using order-only signals such as near-due requested receipt, stale sync, long-open age, and missing classification.
 - `backend/src/worklists/unclassified.ts` lists `sync_exceptions` rows for unclassified, unmapped-supplier, and currency-ambiguous worklists and emits suggested actions for the future admin UI.
@@ -171,6 +185,7 @@ Backend v1 scaffold:
 - `backend/test/cycleTime.test.ts` and optional `backend/test/cycleTime.integration.test.ts` guard F3 threshold validation, no-write query structure, order-age/requested-receipt bottleneck metrics, and live SQL cycle analytics when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/otifRisk.test.ts` and optional `backend/test/otifRisk.integration.test.ts` guard F4 scoring, coverage metadata, no-write query structure, and live SQL early-warning selection when `RUN_SQL_INTEGRATION=true`.
 - `backend/test/unclassifiedWorklist.test.ts` and optional `backend/test/unclassifiedWorklist.integration.test.ts` guard F5 allowlists, mapping, summaries, suggested actions, no-write query structure, and live SQL worklist selection when `RUN_SQL_INTEGRATION=true`.
+- `backend/test/operationalRecords.test.ts` and optional `backend/test/operationalRecords.integration.test.ts` guard the API-mode operational record allowlist, CRUD, stale-write handling, archive, and restore paths.
 - `backend/src/sql/client.ts` exposes `queryParams(sqlText, params)` and transaction-bound execution for parameterized SQL upserts.
 - `docs/BACKEND_HANDOFF.md` is the current backend gate handoff and sequencing source.
 
@@ -186,13 +201,16 @@ Browser operating cadence views:
 Planned backend/integration services:
 
 - Data Warehouse/staging feed.
-- Controlled sync/API service between Data Warehouse and Firestore.
+- Controlled sync/API service between Data Warehouse and the SQL/API backend.
 - Microsoft Graph adapter for SharePoint uploads.
 - Production identity/SSO service if Azure AD/OIDC/custom token path is chosen.
 
 ## Database architecture
 
-Database: Cloud Firestore.
+Database:
+
+- Demo/browser mode: Cloud Firestore.
+- Internal API mode: SQL Server through the backend operational record API.
 
 Collections in `src/schema.js`:
 
@@ -222,14 +240,24 @@ Key concepts:
 - `system_config` stores shared configuration such as import rules, working calendars, and counters.
 - `status_log` stores audit/change/import-history entries.
 
-The database currently has no migrations folder. Schema changes are made by updating `src/schema.js`, validators, forms, renderers, and any import/export logic. The generated data dictionary is the persistent schema documentation.
+The browser schema source remains `src/schema.js`; field changes still require
+validators, forms, renderers, and import/export logic to be updated. The generated
+data dictionary is the persistent browser schema documentation.
+
+The backend SQL schema is migration-based under `backend/db/`. The warehouse-sync
+tables (`orders`, `sync_exceptions`, `import_audit`, `notification_state`) are
+structured SQL tables. The API-mode browser store currently uses
+`dbo.operational_records`, a collection allowlisted JSON record table with a SQL
+`updated_at` stale-write token. This is a practical internal-server bridge until
+IT confirms the final normalized operational schema and identity model.
 
 ## Authentication and authorization architecture
 
 Authentication modes:
 
-- Demo: `APP_CONFIG.demoMode = true`, `authMode = 'demo'`. Uses Firebase anonymous/demo flow and allows demo role switching.
-- Production: `APP_CONFIG.demoMode = false`, `authMode = 'password'`. Uses Firebase Auth email/password and individual user credentials.
+- Demo: `APP_CONFIG.demoMode = true`, `authMode = 'demo'`, `dataMode = 'firebase'`. Uses Firebase anonymous/demo flow and allows demo role switching.
+- Internal production package: `APP_CONFIG.demoMode = false`, `authMode = 'internal'`, `dataMode = 'api'`. Uses local operator setup plus function-key/API perimeter controls until IT supplies the final identity model.
+- Firebase password mode remains possible only if IT chooses that path again by setting `authMode = 'password'` and `dataMode = 'firebase'`.
 
 Officer profile resolution in production mode:
 
@@ -246,9 +274,10 @@ Authorization layers:
 - `PXStore.assertWriteAllowed()` blocks create/update/archive/restore when the current role lacks write permission.
 - Production mode fails closed for unknown roles/resources.
 
-Important limitation:
+Important limitations:
 
-- Client-side authorization is not enough for production. Firestore security rules must enforce the same access model server-side. Role-aligned templates exist in `docs/FIRESTORE_RULES`, and local regression checks guard the main rule assumptions, but the rules still need Firebase Rules Playground/emulator validation and deployment against the final production project.
+- Client-side authorization is not enough for production. In API mode, the internal gateway/backend must enforce identity and authorization server-side. If Firebase is reselected, Firestore security rules must enforce the same access model server-side; role-aligned templates exist in `docs/FIRESTORE_RULES`.
+- API-mode local operator setup is not a final enterprise identity control. It is for closed-environment testing only; pilot/go-live still needs IT-approved SSO, Windows-integrated access, APIM policy, or another server-side identity boundary.
 
 ## API structure
 
@@ -261,9 +290,11 @@ Current backend HTTP API scaffold:
 - `GET /api/analytics/otif-risk` in `backend/src/functions/otifRisk.ts`, function-auth, returns an order-only OTIF early-warning proxy with explicit supplier/shipment/GRN coverage exclusions.
 - `GET /api/worklists/unclassified` in `backend/src/functions/unclassifiedWorklist.ts`, function-auth, returns actionable sync exception worklist rows for future admin remediation screens.
 - `GET /api/notifications/order-alerts/preview` in `backend/src/functions/orderAlertNotifications.ts`, function-auth, returns a dry-run summary of order alert digests without Graph delivery or sent-state writes.
+- `GET /api/records`, `GET/POST /api/records/{collection}`, `PATCH /api/records/{collection}/{id}`, `POST /api/records/{collection}/{id}/archive`, and `POST /api/records/{collection}/{id}/restore` in `backend/src/functions/records.ts`, function-auth, provide the internal browser operational store.
 - `POST /api/sync/purchase-orders` in `backend/src/functions/syncPurchaseOrders.ts`, function-auth, runs the fixture-backed purchase-order sync.
 
-No browser screen currently calls this backend API.
+In API data mode, the browser calls `/api/records` through `PXApiClient`. The other
+read APIs are currently BI/future-screen endpoints.
 
 Internal JavaScript APIs are exposed as `window.PX*` services and `window.__*` bridges. Important examples:
 
@@ -279,9 +310,8 @@ Internal JavaScript APIs are exposed as `window.PX*` services and `window.__*` b
 
 External:
 
-- Firebase Web SDK CDN.
-- Firebase Auth.
-- Cloud Firestore.
+- Firebase Web SDK CDN, Firebase Auth, and Cloud Firestore for demo/Firebase mode only.
+- Internal SQL/API backend for production API mode.
 
 Internal:
 
@@ -306,7 +336,7 @@ Current integration:
 
 Future integration:
 
-- Navision / Business Central -> Data Warehouse/staging -> controlled sync/API service -> Firestore.
+- Navision / Business Central -> Data Warehouse/staging -> controlled sync/API service -> SQL/API backend.
 - Browser must not directly access ERP or Data Warehouse.
 - Sync may refresh ERP-owned and ERP-seeded fields only.
 - Sync must not overwrite Phoenix-owned operational fields.
@@ -327,10 +357,8 @@ Current demo deployment:
 
 Intended production deployment:
 
-- Generate a production HTML build from the same source with demo mode disabled and password auth enabled.
-- Serve over HTTPS from an approved server/static host.
-- Use a dedicated production Firebase project.
-- Deploy reviewed Firestore security rules.
-- Restrict Firebase API key to approved domains and APIs.
-- Use individual user credentials or corporate SSO.
+- Generate a production HTML build from the same source with demo mode disabled and API data mode enabled.
+- Serve the static production HTML and `/api` backend from the approved internal local server or private Azure/VNet host.
+- Use SQL Server through the backend; do not require Firebase in API data mode.
+- Use IT-approved individual identity or corporate SSO before pilot/go-live. The current internal operator setup is temporary for closed-environment testing.
 - Keep ERP and SharePoint integrations server-side.

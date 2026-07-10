@@ -31,6 +31,7 @@ MODULES = [
   'src/globalProgress.js',
   'src/erpOwnership.js','src/schema.js',
   'src/workflows.js','src/validators.js','src/permissions.js',
+  'src/apiClient.js',
   'src/firestoreStore.js',
   'src/importRules.js',
   'src/documentService.js',

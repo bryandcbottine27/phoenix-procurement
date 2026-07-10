@@ -1,12 +1,12 @@
 # Phoenix Procurement - Project State
 
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-10
 
 ## Current application status
 
-Phoenix Procurement is an operational procurement and logistics control tower for Phoenix Beverages and group companies. It is a browser-based Firebase/Firestore application with modular source in `src/`, styles in `styles/main.css`, an HTML shell in `index.html`, and a generated single-file demo build at `dist/phoenix-procurement-DEMO.html`.
+Phoenix Procurement is an operational procurement and logistics control tower for Phoenix Beverages and group companies. It is a browser application with modular source in `src/`, styles in `styles/main.css`, an HTML shell in `index.html`, and a generated single-file demo build at `dist/phoenix-procurement-DEMO.html`. Demo mode uses Firebase/Firestore; the production package is now staged for internal SQL/API mode.
 
-The current source is modular, but the delivered user artifact remains one clean generated HTML file for demo use. The production package is generated from the same source with `APP_CONFIG.demoMode = false` and `APP_CONFIG.authMode = 'password'`.
+The current source is modular, but the delivered user artifact remains one clean generated HTML file for demo use. The production package is generated from the same source with `APP_CONFIG.demoMode = false`, `APP_CONFIG.authMode = 'internal'`, and `APP_CONFIG.dataMode = 'api'`.
 
 Current active entities:
 
@@ -28,7 +28,7 @@ Important continuity note: this folder is now a Git repository. The starting han
 
 Core application foundation:
 
-- Modular JavaScript source tree with 63 source modules.
+- Modular JavaScript source tree with 64 source modules.
 - Single-file build via `build.py`.
 - Business Central-style top navigation, list pages, card pages, FastTabs, filter panes, and Phoenix colour theme.
 - Three-entity handling with active entity switcher.
@@ -42,7 +42,8 @@ Core application foundation:
 
 Data and write control:
 
-- Central Firestore write path in `src/firestoreStore.js` through `PXStore.createRecord`, `updateRecord`, `archiveRecord`, `restoreRecord`, and `logStatusChange`.
+- Central browser write path in `src/firestoreStore.js` through `PXStore.createRecord`, `updateRecord`, `archiveRecord`, `restoreRecord`, and `logStatusChange`.
+- Internal API data mode in `src/apiClient.js`; when `APP_CONFIG.dataMode === 'api'`, `PXStore` routes normal business writes to the backend operational record API instead of Firestore.
 - Validation gate in `src/validators.js`.
 - Field ownership rules in `src/erpOwnership.js`.
 - Workflow/status-transition helpers in `src/workflows.js`.
@@ -138,7 +139,7 @@ ERP import:
 Authentication and access:
 
 - Demo build uses demo/anonymous mode.
-- Production build is intended to use individual username/password through Firebase Auth.
+- Production package is staged for internal API mode with a temporary local operator setup while IT confirms the final SSO/identity perimeter.
 - Officer profile lookup supports Auth UID document id, `authUid`, and `email`.
 - Demo role switching is ignored in production mode.
 - Production permission posture fails closed for unknown roles/resources and for production officer profiles with no assigned role.
@@ -146,31 +147,32 @@ Authentication and access:
 ## Partially completed work
 
 - SharePoint integration is metadata-ready only. Folder path rules exist, but Microsoft Graph upload, folder creation, delete/rename policy, and permission inheritance are not implemented.
-- Data Warehouse integration is partly scaffolded only. `PXWarehouse` defines the browser-side target shape and still returns "not connected"; the current operational feed remains Excel import. The isolated `backend/` Backend v1 scaffold now includes Azure Functions v4, TypeScript, `mssql`, SQL Server DDL, fixture-backed `dwSource.fetchPurchaseOrders()`, purchase-order normalisation, classification for `function` and `orderType`, an ownership-safe SQL upsert service with typed decimal money bindings and `UNCLASSIFIED` exception codes, `POST /api/sync/purchase-orders`, read-only `GET /api/orders`, read-only order-only `GET /api/kpis`, read-only `GET /api/analytics/cycle-time`, read-only order-only `GET /api/analytics/otif-risk`, read-only `GET /api/worklists/unclassified`, F1 read-index migration, disabled-by-default Graph notification scaffolding with a dry-run preview endpoint and SQL `notification_state` repeat suppression, and drift/unit/SQL integration tests against `src/warehouseAdapter.js`, `src/importRules.js`, the sync ownership boundary, the F1a order-list API, the F1b KPI API, F2 order-alert query/routing/suppression, F3 order-age bottleneck analytics, the F4 OTIF early-warning proxy, and the F5 sync-exception worklist API. It is not yet connected to a real warehouse feed or the browser.
+- Data Warehouse integration is partly scaffolded only. `PXWarehouse` defines the browser-side target shape and still returns "not connected"; the current manual operational feed remains Excel import. The isolated `backend/` Backend v1 scaffold now includes Azure Functions v4, TypeScript, `mssql`, SQL Server DDL, fixture-backed `dwSource.fetchPurchaseOrders()`, purchase-order normalisation, classification for `function` and `orderType`, an ownership-safe SQL upsert service with typed decimal money bindings and `UNCLASSIFIED` exception codes, `POST /api/sync/purchase-orders`, read-only `GET /api/orders`, read-only order-only `GET /api/kpis`, read-only `GET /api/analytics/cycle-time`, read-only order-only `GET /api/analytics/otif-risk`, read-only `GET /api/worklists/unclassified`, F1 read-index migration, disabled-by-default Graph notification scaffolding with a dry-run preview endpoint and SQL `notification_state` repeat suppression, and `dbo.operational_records` plus function-key `/api/records` routes for browser API mode. It has drift/unit/SQL integration tests against `src/warehouseAdapter.js`, `src/importRules.js`, the sync ownership boundary, the F1a order-list API, the F1b KPI API, F2 order-alert query/routing/suppression, F3 order-age bottleneck analytics, the F4 OTIF early-warning proxy, the F5 sync-exception worklist API, and the operational record API. It is not yet connected to a real warehouse feed.
 - Firestore security rule templates exist under `docs/FIRESTORE_RULES`. The authenticated template has been tightened to mirror the main app permission matrix and local regression checks guard the highest-risk assumptions, but the rules have not been deployed or validated against a production Firebase project in this repository.
-- Production package generation exists through `tools/package.py` and the two approved zip outputs, but production hosting, Firebase project separation, API-key restriction, and authentication deployment remain IT tasks.
+- Production package generation exists through `tools/package.py` and the two approved zip outputs. It now stages internal SQL/API mode by default; production hosting, backend URL/function-key policy, final identity/SSO, TLS/certificates, and service accounts remain IT tasks.
 - Visual smoke testing is limited by local Firebase/auth/network behaviour in the desktop browser environment. The built demo was opened through localhost in an earlier handover pass and the initial login shell rendered with the then-current module set and no console warnings/errors; authenticated dashboard/role/entity walkthroughs should still be repeated before demo using an approved seeded profile or tester login.
 - Access grid documentation exists, but the role matrix is broad and should be re-tested after every access-sensitive change.
 - Edena import/export support exists in the code path, but it needs business pilot validation with real Edena export samples before it should be considered production-proven.
 
 ## Features planned but not started or not production-ready
 
-- Real Data Warehouse/API sync feed and browser consumption of the SQL read APIs.
+- Real Data Warehouse/API sync feed and final normalized SQL operational schema.
 - Microsoft Graph SharePoint upload adapter.
 - Azure AD / Microsoft 365 SSO or final corporate identity integration.
-- Production Firebase project, hardened rules, API-key restrictions, and HTTPS hosting.
+- Production internal HTTPS hosting, function-key/APIM policy, and server-side identity enforcement.
 - Automated end-to-end browser regression suite.
 - Broader formal unit/integration tests for permissions, data quality, My Work computed actions, and backend sync behaviour beyond the current local regression and backend unit coverage.
 - Server-side audit/reporting pipeline, if required by IT.
 
 ## Current known bugs and limitations
 
-- The root browser app still has no package-managed frontend build, lint, or TypeScript configuration. Backend v1 now has its own `backend/package.json`, TypeScript build, package-managed Azure Functions Core Tools dependency, `mssql`, SQL DDL migration scaffold, fixture source adapter, classifier, transaction-bound parameterized SQL helper, ownership-safe sync service, read-only order-list API, and `node:test` coverage. Current browser validation remains Python build, generated data dictionary check, Node syntax checks, invariant checks for structure/status maps/pre-test data-integrity/package zip hygiene, and local Node regression checks for permission/security/import/Data Quality/My Work contracts.
-- Local backend runtime proof is environment-dependent, but Backend v1 has been proven locally against Docker SQL Server in this Codex desktop environment. Bundled Node/pnpm and package-managed Azure Functions Core Tools are available; SQL Server LocalDB, `sqlcmd`, and global Azure Functions Core Tools are not installed. Validation used disposable `mcr.microsoft.com/mssql/server:2022-latest` containers, applied `backend/db/001_init.sql`, returned a healthy `/api/health` SQL response in Gate 1, and executed Gate 4/F1a/F1b SQL integration tests with no skips.
-- Browser/client-side permission checks are not sufficient for production security. Firestore rules and authenticated identity must enforce access server-side before go-live.
+- The root browser app still has no package-managed frontend build, lint, or TypeScript configuration. Backend v1 now has its own `backend/package.json`, TypeScript build, package-managed Azure Functions Core Tools dependency, `mssql`, SQL DDL migration scaffold, fixture source adapter, classifier, transaction-bound parameterized SQL helper, ownership-safe sync service, read-only order-list/KPI/analytics/worklist APIs, operational record API, and `node:test` coverage. Current browser validation remains Python build, generated data dictionary check, Node syntax checks, invariant checks for structure/status maps/pre-test data-integrity/package zip hygiene, and local Node regression checks for permission/security/import/Data Quality/My Work contracts.
+- Local backend runtime proof is environment-dependent, but Backend v1 has been proven locally against Docker SQL Server in this Codex desktop environment. Bundled Node/pnpm and package-managed Azure Functions Core Tools are available; SQL Server LocalDB, `sqlcmd`, and global Azure Functions Core Tools are not installed. Validation used Docker SQL Server on `localhost:14333`, applied `backend/db/001_init.sql` through `backend/db/004_operational_records.sql`, returned a healthy `/api/health` SQL response in Gate 1, and executed backend SQL integration tests with no skips.
+- Browser/client-side permission checks are not sufficient for production security. API mode removes the Firebase dependency, but final pilot/go-live still needs server-side identity and authorization enforcement through the IT-approved internal gateway/API policy.
 - Demo mode still contains demo aids such as role switching. The guarded demo purge code remains for isolated reset testing, but `REF.demoResetEnabled` is disabled by default and must stay disabled for shared testing, pilot, and production builds.
 - SharePoint upload is not live; documents are metadata/link/demo-upload records only.
-- Data Warehouse sync is not live; Excel import is the current staging feed.
+- Data Warehouse sync is not connected to the real warehouse yet; Excel import remains the current manual staging feed.
+- API mode uses a generic SQL JSON operational record table as an internal-server bridge. It is suitable for closed-environment testing, but a future normalized SQL operational schema may still be required for long-term reporting/governance.
 - Graph notification delivery is scaffolded but disabled by default. It requires IT-provided Graph app registration, Azure app settings/Key Vault secrets, and a recipient map. Sent alert items are recorded in backend SQL `notification_state` after successful email delivery so repeated digest items are suppressed for `ORDER_ALERTS_REPEAT_SUPPRESSION_HOURS` (24 hours by default).
 - Backend cycle-time analytics are order-only. True workflow time-in-stage, stage-transition bottlenecks, and officer stage-SLA analytics require migration of browser `status_log` / workflow transition history into SQL.
 - Backend OTIF early warning is an order-only proxy. Supplier historical delay, supplier promise revision counts, shipment stage, GRN outcome, and true OTIF prediction require additional datasets or approved browser-side `PXProcFollowup` work.
@@ -181,10 +183,10 @@ Authentication and access:
 ## Immediate next development priorities
 
 1. Browser-test the pre-testing stability fixes: demo purge hidden/blocked, duplicate shipment ID blocked, blank shipment status blocked, receipt result requiring GRN date/link, ready-without-shipment grace period, milestone amount reconciliation, and order Awaiting/Overdue filters after GRN.
-2. Repeat a visual smoke test of dashboard, entity switching, filter pane, order detail, shipment detail, Exports/Outbound, KPI Trends capture/backfill, payment permissions, and production login mode.
+2. Repeat a visual smoke test of dashboard, entity switching, filter pane, order detail, shipment detail, Exports/Outbound, KPI Trends capture/backfill, payment permissions, and production API-mode login/setup.
 3. Re-test access rules in the browser for view-only users, especially payment request creation, exports, KPI capture, update request visibility, and GRN entry through orders versus shipments.
 4. Extend automated checks further into browser/e2e smoke coverage once a test runner/environment is selected.
-5. Validate and deploy the authenticated Firestore rules in the final Firebase project, then decide the next delivery tranche: SharePoint adapter design, Data Warehouse/API design, or operational feature polishing.
+5. Confirm the IT identity/API hosting design, then decide the next delivery tranche: SharePoint adapter design, real Data Warehouse connection, normalized SQL operational schema, or operational feature polishing.
 
 ## Current validation baseline
 
@@ -196,10 +198,10 @@ Last local validation during this handover pass:
 - Pre-test data-integrity invariants and approved package-zip hygiene checks: passed.
 - Local role/security/import/Data Quality/My Work regression checks plus Daily Control Room/Supplier Chase/Exception Workbench structural checks: passed.
 - Localhost browser shell smoke of the modular source: passed for the new navigation entries and view containers with no console errors; full authenticated dashboard walkthrough was not performed from this session to avoid creating/submitting a new Firebase demo profile.
-- JavaScript syntax check for all 63 modules: passed.
-- Backend `pnpm test` with Docker SQL integration (`RUN_SQL_INTEGRATION=true`) passed: 49 pass, 0 skipped.
+- JavaScript syntax check for all 64 modules: passed.
+- Backend `pnpm test` with Docker SQL integration (`RUN_SQL_INTEGRATION=true`) passed: 51 pass, 0 skipped.
 - Demo build output generated: `dist/phoenix-procurement-DEMO.html`.
-- Isolated staged production build with `demoMode: false` and `authMode: 'password'`: passed.
+- Isolated staged production build with `demoMode: false`, `authMode: 'internal'`, and `dataMode: 'api'`: passed.
 - Demo and production zip packages refreshed with these handover docs included:
   - `Phoenix Procurement DEMO FULL.zip`
   - `Phoenix Procurement PRODUCTION FULL.zip`

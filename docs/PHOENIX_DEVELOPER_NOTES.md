@@ -2,8 +2,8 @@
 
 **App:** Phoenix Procurement — a procurement & logistics **control tower** for Phoenix Beverages and its group companies (Seychelles Breweries, Edena). It sits *on top of* the ERP (Navision now, Business Central later); it is **not** a replacement ERP.
 
-**Auth model:** Demo mode can use Firebase Anonymous Authentication for prototype testing. Production/password mode uses individual user credentials and links each authenticated user to an officer profile by Auth UID, `authUid`, or `email`.
-**Firebase project:** `phoenix-procurement2`.
+**Auth model:** Demo mode can use Firebase Anonymous Authentication for prototype testing. The current production package is staged for internal SQL/API mode with a temporary local operator setup; final individual identity still needs IT to approve SSO, Windows-integrated access, APIM policy, Firebase/password, or another internal gateway.
+**Firebase project:** `phoenix-procurement2` for demo/Firebase mode only.
 **Status:** Operational prototype, ERP/Data-Warehouse-ready (read-only integration designed, not yet connected).
 **Prototype version:** `prototype-2026.06-stage1` (see `REF.prototypeVersion`).
 
@@ -40,9 +40,11 @@ Files load in this order (see `index.html` / `build.py`). Modules communicate th
 
 ```
 src/
-  core.js               REF config, Firebase init, state, PXUtils helpers, navigation,
+  core.js               REF config, Firebase/API mode init, state, PXUtils helpers, navigation,
                         modal, live subscriptions (PXStore now lives in firestoreStore.js)
-  firestoreStore.js     PXStore — the ONE write path: validates, stamps, strips undefined, audits
+  apiClient.js          PXApiClient — internal SQL/API adapter used only in APP_CONFIG.dataMode === 'api'
+  firestoreStore.js     PXStore — the ONE write path: validates, stamps, strips undefined,
+                        audits, and delegates to Firestore or PXApiClient
   dataQuality.js        non-blocking record-health controls (orderDataQuality, shipmentDataQuality,
                         rfpDataQuality, supplierDataQuality, orderHealth) plus working-day/DQ-context helpers
   controls.js           PXAmendments / PXClaims / PXDelegation engines (Increment 5a/5c/5d) +
@@ -1806,7 +1808,9 @@ runs as Logistics in the same browser at the same time, both seeing the same liv
 
 The app ships from one source with deployment switches in `APP_CONFIG` at the very top of
 `src/core.js`. `demoMode: true` keeps prototype/testing aids available. Production should use
-`demoMode: false` and `authMode: 'password'`, so each person signs in with their own account.
+`demoMode: false`, `authMode: 'internal'`, and `dataMode: 'api'` for the current
+internal SQL/API package. Firebase/password mode remains possible only if IT reselects
+that path.
 
 Flipping `demoMode` to false (via `isDemoMode()`, used throughout) does all of the following with no
 other code change:
@@ -1821,17 +1825,15 @@ other code change:
   (the prototype's permissive defaults apply only in demo mode),
 - hides the **"Clear all data" purge** tool.
 
-`authMode: 'password'` shows the username/password login form. It signs in through Firebase
-Email/Password (or a compatible SSO bridge later) and then loads the officer profile by
-`officers/{auth uid}`, `authUid`, or `email`. The app no longer supports shared departmental
-logins or the former "Who's working?" picker; My Work and audit attribution depend on the
-individual authenticated user.
+`dataMode: 'api'` skips Firebase module loading, uses the local/internal setup form, loads
+records from `/api/records`, and sends normal `PXStore` writes to the backend operational
+record API. The current local operator setup is a testing bridge only; My Work and audit
+attribution become production-grade only after IT supplies the final identity model.
 
 Important honesty for maintainers: these are **client-side** controls. They are necessary but not
-sufficient. Real enforcement is the **Firestore security rules** (templates in
-`docs/FIRESTORE_RULES/`) plus the auth decision — both covered in `docs/GO_LIVE_RUNBOOK.md`. The build
-script can emit either posture; the source default is `demoMode: true`, and a production file is
-produced by flipping the flag at build time.
+sufficient. Real enforcement must come from the internal gateway/backend policy in API mode.
+If Firebase/password is reselected, real enforcement is the **Firestore security rules**
+(templates in `docs/FIRESTORE_RULES/`) plus the auth decision.
 
 ---
 
@@ -1932,13 +1934,22 @@ Before building, answer these (this keeps the app from sprawling):
 
 ## 15. Known limitations
 
-- Production authentication is configured through Firebase/SSO and individual officer profiles.
-  Demo mode still uses anonymous name/code setup for prototype testing.
+- Production package generation now uses internal API mode (`demoMode: false`,
+  `authMode: 'internal'`, `dataMode: 'api'`) and does not load Firebase modules.
+  The local operator setup is temporary for closed-environment testing; pilot/go-live
+  still needs IT-approved identity and server-side authorization.
+- Demo mode still uses Firebase anonymous name/code setup for prototype testing.
 - Documents support two methods: a SharePoint/OneDrive **link** (recommended) and a
   small **demo file upload** (base64 in Firestore, ≤600 KB). Binary storage at scale
   (Firebase Storage / SharePoint document library via Graph API) is future work.
 - Hard deletes exist in exactly one place: the demo-only purge (see §12), which must be disabled before pilot/production data is used.
-- ERP/Data Warehouse integration is placeholder only — no live Navision/BC, Data Warehouse, or direct browser calls; the maps and adapters define the future controlled sync contract.
+- ERP/Data Warehouse integration is backend-scaffolded but not connected to the real
+  warehouse yet; no live Navision/BC browser calls are allowed. The maps, adapters,
+  and backend sync service define the controlled sync contract.
+- API data mode currently stores browser operational records in SQL
+  `dbo.operational_records` as allowlisted JSON records. This supports internal local
+  server testing without Firebase, but a later normalized SQL operational schema may
+  still be approved for long-term production reporting/governance.
 - Working-day calculations exclude weekends and the approved holiday dates maintained in System
   Settings → Working Calendars; there is no automatic public-holiday feed.
 - ES module source needs a local server; the single-file build is the shareable artefact.
@@ -1949,7 +1960,10 @@ Before building, answer these (this keeps the app from sprawling):
 ## 16. Future improvements
 
 - Convert `window.*` wiring to native ES `import`/`export`.
-- Real login (Azure AD) + Firestore security rules generated from `REF.permissions`.
-- Live ERP -> Data Warehouse -> Phoenix sync service using the `PXWarehouse` contract and `erpOwnership` maps.
+- Real identity (Entra ID/M365 SSO, Windows-integrated access, APIM policy, or another
+  IT-approved path) with server-side authorization generated or reconciled from
+  `REF.permissions`.
+- Live ERP -> Data Warehouse -> backend SQL/API sync service using the `PXWarehouse`
+  contract and `erpOwnership` maps.
 - Secure document upload (SharePoint / Firebase Storage) replacing link-only.
 - Promote validation warnings to errors as the team confirms rules.

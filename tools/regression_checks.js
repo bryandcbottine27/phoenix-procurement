@@ -827,6 +827,8 @@ check('My Work hides processed follow-up', myWork && myWork.actionCount === 0);
 const indexSource = read('index.html');
 const buildSource = read('build.py');
 const coreSource = read('src/core.js');
+const apiClientSource = read('src/apiClient.js');
+const packageSource = read('tools/package.py');
 const managementControlsSource = read('src/modules/reports/managementControls.js');
 const dailyControlSource = read('src/modules/reports/dailyControlRoom.js');
 const dailyViews = ['dailycontrol', 'supplierchase', 'exceptionworkbench'];
@@ -837,6 +839,30 @@ check('Daily control module loads after management controls',
 
 check('Daily control source is loaded by index.html',
   indexSource.includes('src/modules/reports/dailyControlRoom.js'));
+
+check('API data-mode client loads before PXStore',
+  indexSource.indexOf('src/apiClient.js') >= 0
+  && indexSource.indexOf('src/apiClient.js') < indexSource.indexOf('src/firestoreStore.js')
+  && buildSource.indexOf("'src/apiClient.js'") >= 0
+  && buildSource.indexOf("'src/apiClient.js'") < buildSource.indexOf("'src/firestoreStore.js'"));
+
+check('Production package is staged for internal API mode',
+  packageSource.includes("\"dataMode: 'firebase',\"")
+  && packageSource.includes("\"dataMode: 'api',\"")
+  && packageSource.includes("\"authMode: 'internal',\""));
+
+check('Firebase modules are lazy-loaded only outside API data mode',
+  !/^\s*import\s+\{[^}]*firebase/mi.test(coreSource)
+  && coreSource.includes('function usesApiDataMode')
+  && coreSource.includes('await initFirebaseIfNeeded();')
+  && coreSource.includes("import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js')"));
+
+check('API client exposes operational record CRUD methods',
+  apiClientSource.includes('window.PXApiClient')
+  && apiClientSource.includes('loadAll')
+  && apiClientSource.includes('createRecord')
+  && apiClientSource.includes('archiveRecord')
+  && apiClientSource.includes('restoreRecord'));
 
 dailyViews.forEach(view => {
   check(`Operational cadence view ${view} has nav, section, renderer and breadcrumb`,

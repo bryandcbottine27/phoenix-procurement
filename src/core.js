@@ -1,24 +1,25 @@
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js';
-import { getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
-import {
-  getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
-  onSnapshot, query, where, orderBy, limit, serverTimestamp, runTransaction
-} from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js';
+let initializeApp, getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged;
+let getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc;
+let onSnapshot, query, where, orderBy, limit, serverTimestamp, runTransaction;
 
 /* ============================================================
    APP CONFIG — the ONE place IT edits for deployment.
    ============================================================
    For production:
-     1. Replace `firebase` below with YOUR Firebase project's config.
-     2. Set `demoMode: false` and `authMode: 'password'` — this disables all no-login
-        demo aids and requires each user to sign in with their own credential.
-     3. Apply the Firestore security rules and (if used) Azure AD login per the
-        Go-Live runbook (docs/GO_LIVE_RUNBOOK.md). The app code does not need to
-        change for either auth path — only this block and the server config.
+     1. Use `demoMode: false`, `authMode: 'internal'`, and `dataMode: 'api'` for
+        the internal SQL/API package.
+     2. Set `apiBaseUrl` / `apiFunctionKey` if the backend is not same-origin.
+     3. Use `authMode: 'password'` only if IT chooses the Firebase password path
+        again; then apply the Firestore security rules per the go-live runbook.
    When demoMode is true the app behaves as the no-login prototype/demo build. */
 const APP_CONFIG = {
   demoMode: true,   // PRODUCTION: set to false
-  authMode: 'demo', // 'demo' = anonymous test profile; 'password' = individual username/password
+  authMode: 'demo', // 'demo' = anonymous test profile; 'internal' = local operator setup; 'password' = individual username/password
+  dataMode: 'firebase', // 'firebase' = current demo/Firestore path; 'api' = internal SQL/API mode
+  apiBaseUrl: '/api', // used when dataMode is 'api'; keep same-origin unless IT gives another URL
+  apiFunctionKey: '', // optional x-functions-key for internal Azure Functions/API deployment
+  apiPollMs: 30000,
+  internalDefaultRole: 'admin', // placeholder until IT confirms AD/SSO/local-user integration
   loginEmailDomain: '', // optional: if set, "bbottine" becomes "bbottine@your-domain"
   bcStructure: true, // Business Central top-nav layout. Set false for the classic sidebar.
   bcCardPage: true, // Open order detail as a full-page BC card instead of a modal. Set false to revert to modal.
@@ -32,9 +33,17 @@ const APP_CONFIG = {
   }
 };
 window.APP_CONFIG = APP_CONFIG;
+function dataMode() {
+  return (window.APP_CONFIG && window.APP_CONFIG.dataMode) || 'firebase';
+}
+function usesApiDataMode() {
+  return dataMode() === 'api';
+}
 function isDemoMode() { return !!(window.APP_CONFIG && window.APP_CONFIG.demoMode); }
 window.__isDemoMode = isDemoMode;
+window.__usesApiDataMode = usesApiDataMode;
 function usesPasswordAuth() {
+  if (usesApiDataMode()) return window.APP_CONFIG && window.APP_CONFIG.authMode === 'password';
   return (window.APP_CONFIG && window.APP_CONFIG.authMode === 'password') || !isDemoMode();
 }
 function normaliseLoginEmail(raw) {
@@ -49,11 +58,57 @@ function normaliseLoginEmail(raw) {
    FIREBASE CONFIG
    ============================================================ */
 const firebaseConfig = APP_CONFIG.firebase;
+let fbApp = null;
+let auth = null;
+let db = null;
 
-// Initialize Firebase
-const fbApp = initializeApp(firebaseConfig);
-const auth = getAuth(fbApp);
-const db = getFirestore(fbApp);
+function installNoFirebaseStubs() {
+  const unavailable = name => () => { throw new Error(`${name} is unavailable in API data mode.`); };
+  collection = unavailable('Firestore collection');
+  doc = unavailable('Firestore doc');
+  addDoc = unavailable('Firestore addDoc');
+  setDoc = unavailable('Firestore setDoc');
+  getDoc = unavailable('Firestore getDoc');
+  getDocs = unavailable('Firestore getDocs');
+  updateDoc = unavailable('Firestore updateDoc');
+  deleteDoc = unavailable('Firestore deleteDoc');
+  onSnapshot = unavailable('Firestore onSnapshot');
+  query = unavailable('Firestore query');
+  where = unavailable('Firestore where');
+  orderBy = unavailable('Firestore orderBy');
+  limit = unavailable('Firestore limit');
+  runTransaction = unavailable('Firestore runTransaction');
+  serverTimestamp = () => new Date().toISOString();
+  signOut = async () => {};
+  signInAnonymously = async () => ({ user: { uid: 'internal-local', email: '' } });
+  signInWithEmailAndPassword = async () => ({ user: { uid: 'internal-local', email: '' } });
+  onAuthStateChanged = (_auth, callback) => {
+    setTimeout(() => callback(null), 0);
+    return () => {};
+  };
+}
+
+async function initFirebaseIfNeeded() {
+  if (usesApiDataMode()) {
+    installNoFirebaseStubs();
+    return;
+  }
+  const [appMod, authMod, firestoreMod] = await Promise.all([
+    import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
+    import('https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js'),
+    import('https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js')
+  ]);
+  ({ initializeApp } = appMod);
+  ({ getAuth, signInAnonymously, signInWithEmailAndPassword, signOut, onAuthStateChanged } = authMod);
+  ({
+    getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
+    onSnapshot, query, where, orderBy, limit, serverTimestamp, runTransaction
+  } = firestoreMod);
+  fbApp = initializeApp(firebaseConfig);
+  auth = getAuth(fbApp);
+  db = getFirestore(fbApp);
+}
+await initFirebaseIfNeeded();
 
 /* ============================================================
    Write-failure safety net. Individual save paths show their own toast, but a
@@ -1272,7 +1327,8 @@ function showLoader(target) { target.innerHTML = `<div class="loader-full"><div 
 
 /* ============================================================
    AUTH
-   - Demo mode: anonymous sign-in + local name/code profile for prototype testing.
+   - Demo/Firebase mode: anonymous sign-in + local name/code profile for prototype testing.
+   - API/internal mode: local operator setup while final IT identity is pending.
    - Password mode: each user signs in with their own username/password. Access comes
      from the officer profile linked to that authenticated user, not from a shared login.
    ============================================================ */
@@ -1293,24 +1349,29 @@ function clearSavedProfile() {
 
 function configureLoginScreen() {
   const password = usesPasswordAuth();
+  const api = usesApiDataMode();
   const intro = $('#login-intro');
   const pwdFields = $('#password-login-fields');
   const demoFields = $('#demo-profile-fields');
   const foot = $('#login-footnote-text');
   const btn = $('#setup-btn');
   const title = document.querySelector('#login-screen .login-brand h1');
-  if (title) title.textContent = password ? 'Sign in' : 'Welcome';
+  if (title) title.textContent = password ? 'Sign in' : api ? 'Internal access' : 'Welcome';
   if (intro) {
     intro.innerHTML = password
       ? 'Sign in with the username and password provided by IT.'
-      : "First time on this browser? Tell us who you are.<br>You'll only see this once.";
+      : api
+        ? 'Identify this workstation session for the internal server.'
+        : "First time on this browser? Tell us who you are.<br>You'll only see this once.";
   }
   if (pwdFields) pwdFields.classList.toggle('hidden', !password);
   if (demoFields) demoFields.classList.toggle('hidden', password);
   if (foot) {
     foot.innerHTML = password
       ? 'Each user must use their own account. Questions? Contact <strong>Bryan Bottine</strong>.'
-      : 'Your choice is saved on this device. Questions? Contact <strong>Bryan Bottine</strong>.';
+      : api
+        ? 'This local setup is temporary until IT confirms SSO or Windows-integrated identity.'
+        : 'Your choice is saved on this device. Questions? Contact <strong>Bryan Bottine</strong>.';
   }
   if (btn) btn.textContent = password ? 'Sign in' : 'Continue';
 }
@@ -1379,7 +1440,16 @@ $('#setup-form').addEventListener('submit', async e => {
   $('#setup-error').classList.remove('show');
   setLoginBusy(true);
   try {
-    if (usesPasswordAuth()) {
+    if (usesApiDataMode()) {
+      const name = $('#setup-name').value.trim();
+      const code = $('#setup-code').value.trim().toUpperCase();
+      if (!name || !code) throw new Error('Enter your name and code.');
+      if (code.length < 2 || code.length > 12) {
+        throw new Error('Code should be between 2 and 12 characters.');
+      }
+      saveProfile({ name, code });
+      await continueAfterAuth({ uid: 'internal-' + code.toLowerCase(), email: '' });
+    } else if (usesPasswordAuth()) {
       const email = normaliseLoginEmail($('#login-email') && $('#login-email').value);
       const password = ($('#login-password') && $('#login-password').value) || '';
       if (!email || !password) {
@@ -1404,6 +1474,9 @@ $('#setup-form').addEventListener('submit', async e => {
   } catch (err) {
     console.error(err);
     let msg = (usesPasswordAuth() ? 'Sign-in failed: ' : 'Setup failed: ') + err.message;
+    if (usesApiDataMode()) {
+      msg = 'Internal session setup failed: ' + err.message;
+    }
     if (err.code === 'auth/admin-restricted-operation' || err.code === 'auth/operation-not-allowed') {
       msg = usesPasswordAuth()
         ? 'Password sign-in is not enabled in Firebase. Ask IT to enable Email/Password or SSO.'
@@ -1458,7 +1531,21 @@ async function continueAfterAuth(user) {
   try {
     state.user = user;
     try {
-      if (usesPasswordAuth()) {
+      if (usesApiDataMode()) {
+        const saved = loadSavedProfile();
+        if (!saved) {
+          showLoginScreen();
+          return;
+        }
+        state.officer = {
+          id: user.uid || ('internal-' + String(saved.code || 'user').toLowerCase()),
+          fullName: saved.name,
+          code: String(saved.code || '').toUpperCase(),
+          role: (window.APP_CONFIG && window.APP_CONFIG.internalDefaultRole) || 'admin',
+          active: true,
+          internal: true
+        };
+      } else if (usesPasswordAuth()) {
         state.officer = await loadPasswordOfficerProfile(user);
         if (state.officer.active === false) {
           throw new Error('Your Phoenix officer profile is inactive. Contact an administrator.');
@@ -1502,7 +1589,7 @@ async function continueAfterAuth(user) {
       }
     } catch (err) {
       console.error('Officer load failed', err);
-      const msg = (usesPasswordAuth() ? 'Profile access failed: ' : 'Profile setup failed: ') + (err.message || 'unknown Firebase error');
+      const msg = (usesApiDataMode() ? 'Internal profile setup failed: ' : usesPasswordAuth() ? 'Profile access failed: ' : 'Profile setup failed: ') + (err.message || 'unknown session error');
       toast(msg, 'danger');
       showLoginScreen(msg);
       if (usesPasswordAuth()) {
@@ -1555,35 +1642,46 @@ async function continueAfterAuth(user) {
   }
 }
 
-onAuthStateChanged(auth, async user => {
-  if (user) {
-    await continueAfterAuth(user);
+if (usesApiDataMode()) {
+  const saved = loadSavedProfile();
+  if (saved) {
+    continueAfterAuth({ uid: 'internal-' + String(saved.code || 'user').toLowerCase(), email: '' });
   } else {
-    // Not signed in. Password mode waits for the user's own credential; demo mode
-    // starts an anonymous prototype session.
     state.user = null; state.officer = null;
     state.unsubs.forEach(u => u && u()); state.unsubs = [];
-    if (usesPasswordAuth()) {
-      showLoginScreen();
-      return;
-    }
-    try {
-      await signInAnonymously(auth);
-      // onAuthStateChanged will fire again with a user
-    } catch (err) {
-      console.error(err);
-      let msg = 'Could not start session: ' + err.message;
-      if (err.code === 'auth/admin-restricted-operation' || err.code === 'auth/operation-not-allowed') {
-        msg = 'Anonymous sign-in is not enabled in Firebase. See Deployment Guide §3.2.';
-      } else if (err.code === 'auth/invalid-api-key' || err.code === 'auth/configuration-not-found') {
-        msg = 'Firebase is not configured. Edit firebaseConfig in the HTML file.';
-      }
-      $('#login-screen').classList.remove('hidden');
-      $('#setup-error').textContent = msg;
-      $('#setup-error').classList.add('show');
-    }
+    showLoginScreen();
   }
-});
+} else {
+  onAuthStateChanged(auth, async user => {
+    if (user) {
+      await continueAfterAuth(user);
+    } else {
+      // Not signed in. Password mode waits for the user's own credential; demo mode
+      // starts an anonymous prototype session.
+      state.user = null; state.officer = null;
+      state.unsubs.forEach(u => u && u()); state.unsubs = [];
+      if (usesPasswordAuth()) {
+        showLoginScreen();
+        return;
+      }
+      try {
+        await signInAnonymously(auth);
+        // onAuthStateChanged will fire again with a user
+      } catch (err) {
+        console.error(err);
+        let msg = 'Could not start session: ' + err.message;
+        if (err.code === 'auth/admin-restricted-operation' || err.code === 'auth/operation-not-allowed') {
+          msg = 'Anonymous sign-in is not enabled in Firebase. See Deployment Guide §3.2.';
+        } else if (err.code === 'auth/invalid-api-key' || err.code === 'auth/configuration-not-found') {
+          msg = 'Firebase is not configured. Edit firebaseConfig in the HTML file.';
+        }
+        $('#login-screen').classList.remove('hidden');
+        $('#setup-error').textContent = msg;
+        $('#setup-error').classList.add('show');
+      }
+    }
+  });
+}
 
 $('#user-chip').addEventListener('click', async () => {
   // DEMO: the chip opens the ROLE SWITCHER (the testing tool for changing role/permissions).
@@ -2002,9 +2100,42 @@ function isControlSummaryView(view) { return CONTROL_SUMMARY_VIEWS.includes(view
 /* ============================================================
    REAL-TIME DATA SUBSCRIPTIONS
    ============================================================ */
+function refreshAfterApiSnapshot() {
+  if (window.__flagWriteOk) window.__flagWriteOk();
+  updateCounts();
+  if (state.view) renderView(state.view);
+  if (window.__refreshDetailSections) window.__refreshDetailSections();
+}
+
+async function loadApiSnapshot() {
+  if (!window.PXApiClient) throw new Error('PXApiClient is not loaded.');
+  await window.PXApiClient.loadAll();
+  refreshAfterApiSnapshot();
+}
+
+function subscribeAllApi() {
+  state.unsubs.forEach(u => u && u());
+  state.unsubs = [];
+  loadApiSnapshot().catch(err => {
+    console.error('API data load failed', err);
+    flagWriteError('API data load', err);
+  });
+  const pollMs = Math.max(0, Number((window.APP_CONFIG && window.APP_CONFIG.apiPollMs) || 0));
+  if (pollMs) {
+    const timer = setInterval(() => {
+      loadApiSnapshot().catch(err => console.warn('API data refresh skipped:', err && err.message));
+    }, pollMs);
+    state.unsubs.push(() => clearInterval(timer));
+  }
+}
+
 function subscribeAll() {
   state.unsubs.forEach(u => u && u());
   state.unsubs = [];
+  if (usesApiDataMode()) {
+    subscribeAllApi();
+    return;
+  }
 
   state.unsubs.push(onSnapshot(query(collection(db, 'orders'), orderBy('dateOfOrder', 'desc')),
     snap => {

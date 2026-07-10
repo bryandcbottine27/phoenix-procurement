@@ -65,7 +65,7 @@ Scope:
 - Test payment visibility versus payment creation for view-only roles.
 - Test milestone schedules with rounding-sensitive percentages and confirm the forecast/RFP prefill reconciles to the PO amount.
 - Test My Work item disappears after the source action is processed.
-- Test production password mode in a staged build.
+- Test production API/internal mode in a staged build.
 
 Acceptance criteria:
 
@@ -170,7 +170,7 @@ Validation:
 
 ## Milestone 4 - Data Warehouse/API integration design
 
-Status: Backend v1 Gate 2 complete; Gate 1 was locally runtime-proven against Docker SQL Server, and Gate 2 fixture source/mapping tests are green. Still dependent on IT/data team for real Data Warehouse and production SQL environment.
+Status: Backend v1 Gate 4/F1/F2/F3/F4/F5 and browser API-mode foundation are implemented and locally proven against Docker SQL Server. Still dependent on IT/data team for the real Data Warehouse feed, production SQL environment, final identity model, and hosting/security perimeter.
 
 Goal:
 
@@ -207,6 +207,7 @@ Scope:
 - F3 adds read-only `GET /api/analytics/cycle-time` for order-age, requested-receipt, stale-sync, and long-open bottleneck analytics grouped by officer/supplier/category/function, with explicit coverage limits for true workflow time-in-stage until status history is migrated to SQL.
 - F4 adds read-only `GET /api/analytics/otif-risk` as an order-only early-warning proxy, with explicit coverage limits for supplier historical delay, promise revisions, shipment stage, GRN outcome, and true OTIF. The browser-side `PXProcFollowup` predictive enhancement remains deferred because the handoff also says browser untouched unless explicitly approved.
 - F5 adds read-only `GET /api/worklists/unclassified` for unclassified/unmapped/currency-ambiguous sync exception worklists, with suggested actions for admin tooling. The browser now has a read-only Exception Workbench over Firestore import/classification/supplier-mapping exceptions, while one-click backend add-rule/map-supplier/resolve-currency write actions remain deferred pending final write-design approval.
+- Internal API data mode adds `src/apiClient.js`, lazy Firebase loading, production package staging for `dataMode: 'api'`, and `backend/db/004_operational_records.sql` plus `/api/records` routes for closed-environment browser testing without Firebase.
 - Backend handoff items are implemented through safe backend/API equivalents. Deferred items needing explicit browser approval: `PXProcFollowup` predictive enhancement and the unclassified/unmapped admin UI/write actions.
 - Gate 3 SQL upsert must be parameterized through `mssql` request inputs for every external value; no warehouse/fixture/user value may be interpolated into SQL text.
 
@@ -223,11 +224,11 @@ Validation:
 - Build passes.
 - Import/sync test with representative Phoenix, Seychelles, and Edena rows.
 - Reconciliation report reviewed by business owner.
-- Backend gate validation additionally requires a SQL Server LocalDB or Docker SQL Server instance plus Azure Functions Core Tools. If SQL is not available, backend integration tests are code-reviewed but not runtime-proven.
+- Backend gate validation additionally requires a SQL Server LocalDB or Docker SQL Server instance plus Azure Functions Core Tools. In this Codex environment Docker SQL Server on `localhost:14333` has been used successfully; if SQL is not available in another environment, backend integration tests are code-reviewed but not runtime-proven.
 
 ## Milestone 5 - Production authentication and security
 
-Status: required before pilot/production outside the test environment.
+Status: partly scaffolded for closed-environment testing; final IT identity/security design still required before pilot/production.
 
 Goal:
 
@@ -235,34 +236,32 @@ Replace demo access with real user identity and server-side access control.
 
 Dependencies:
 
-- IT chooses Firebase email/password or Azure AD/M365 SSO path.
-- Dedicated production Firebase project.
-- Officer records populated with correct roles and emails/auth UIDs.
+- IT chooses Entra ID/M365 SSO, Windows-integrated access, APIM policy, Firebase email/password, or another approved internal identity path.
+- If Firebase is reselected, a dedicated production Firebase project and Firestore rules deployment are required.
+- Officer records populated with correct roles and emails/auth UIDs or mapped internal identity claims.
 
 Scope:
 
-- Configure production Firebase project.
-- Set `APP_CONFIG.demoMode = false`.
-- Set `APP_CONFIG.authMode = 'password'` or corporate SSO equivalent.
-- Deploy and test Firestore rules.
-- Use the role-aligned authenticated template in `docs/FIRESTORE_RULES/firestore.rules.authenticated`.
-- Restrict API key.
+- Default internal package path already sets `APP_CONFIG.demoMode = false`, `APP_CONFIG.authMode = 'internal'`, and `APP_CONFIG.dataMode = 'api'`.
+- Replace the temporary local operator setup with the IT-approved identity model before pilot/go-live.
+- If Firebase is reselected, configure the production Firebase project, deploy/test Firestore rules, use the role-aligned authenticated template in `docs/FIRESTORE_RULES/firestore.rules.authenticated`, and restrict the API key.
+- If API mode remains the production path, enforce user identity and authorization at the internal gateway/backend layer and keep function keys/secrets outside committed files.
 - Remove or disable demo purge in production.
 - Test every role from the access grid.
 
 Acceptance criteria:
 
-- Each user logs in with individual credentials.
+- Each user is identifiable through the IT-approved identity model.
 - Users cannot self-change role through URL or UI.
 - Unknown role fails closed.
-- Firestore rules block unauthorized writes even if the browser UI is bypassed.
+- Server-side rules/API policy block unauthorized writes even if the browser UI is bypassed.
 - View-only roles cannot create payment requests or edit restricted records.
 - A production officer profile with no role or an unknown role receives no write access and no direct-view navigation access.
 
 Validation:
 
 - Build passes.
-- Firebase Rules Playground tests.
+- Server-side identity/API policy tests, or Firebase Rules Playground tests if Firebase is reselected.
 - Manual role-by-role access test using `docs/ACCESS_CHECKLIST.md`.
 
 ## Milestone 6 - Pilot data and operational readiness
@@ -277,7 +276,7 @@ Dependencies:
 
 - Milestone 1.
 - Either manual Excel import or warehouse pilot feed.
-- Production-like Firebase/staging environment.
+- Production-like internal SQL/API staging environment.
 
 Scope:
 
@@ -317,9 +316,9 @@ Dependencies:
 
 Scope:
 
-- Deploy production HTML over HTTPS.
-- Use production Firebase project.
-- Confirm security rules and backups.
+- Deploy production HTML and backend API over HTTPS on the approved internal host.
+- Use production SQL Server/API configuration.
+- Confirm server-side identity/API policy and backups.
 - Confirm document storage decision.
 - Confirm ERP/data feed decision.
 - Train users.
@@ -336,5 +335,5 @@ Validation:
 
 - Production build smoke test.
 - Role-by-role access test.
-- Firestore rules test.
+- Server-side identity/API policy test.
 - Backup restore drill, if required by IT.

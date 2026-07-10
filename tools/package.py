@@ -114,7 +114,8 @@ def make_production(stage: Path) -> None:
 
     for path in [stage / "src" / "core.js", prod_dist]:
         replace_required(path, "demoMode: true,", "demoMode: false,")
-        replace_required(path, "authMode: 'demo',", "authMode: 'password',")
+        replace_required(path, "authMode: 'demo',", "authMode: 'internal',")
+        replace_required(path, "dataMode: 'firebase',", "dataMode: 'api',")
 
     build_py = stage / "build.py"
     replace_required(build_py, "phoenix-procurement-DEMO.html", "phoenix-procurement-PRODUCTION.html")
