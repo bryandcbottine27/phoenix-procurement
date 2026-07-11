@@ -876,10 +876,27 @@ check('Test-mode banner is shown only by demo-mode code',
 check('API client exposes operational record CRUD methods',
   apiClientSource.includes('window.PXApiClient')
   && apiClientSource.includes('loadAll')
+  && apiClientSource.includes('loadCollection')
+  && apiClientSource.includes('pollChangedCollections')
   && apiClientSource.includes('createRecord')
   && apiClientSource.includes('archiveRecord')
   && apiClientSource.includes('restoreRecord')
   && apiClientSource.includes('nextCounter'));
+
+const apiClientWriteBlock = apiClientSource.slice(
+  apiClientSource.indexOf('async function createRecord'),
+  apiClientSource.indexOf('async function nextCounter')
+);
+check('API client write refreshes only the affected collection',
+  apiClientWriteBlock.includes('refreshCollectionAfterWrite(collectionName)')
+  && !apiClientWriteBlock.includes('await loadAll()'));
+
+check('API data mode uses head polling instead of full reload polling',
+  apiClientSource.includes("request('/records/heads'")
+  && apiClientSource.includes('async function pollChangedCollections')
+  && coreSource.includes('apiPollMs: 15000')
+  && coreSource.includes('window.PXApiClient.pollChangedCollections()')
+  && !coreSource.includes("loadApiSnapshot().catch(err => console.warn('API data refresh skipped:'"));
 
 check('API client sends officer attribution header',
   apiClientSource.includes("x-phoenix-user")

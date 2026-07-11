@@ -3,6 +3,7 @@ import {
   archiveOperationalRecord,
   createOperationalRecord,
   getOperationalRecord,
+  listOperationalRecordHeads,
   listOperationalRecords,
   OperationalBadRequestError,
   OperationalNotFoundError,
@@ -23,6 +24,14 @@ async function jsonBody(request: HttpRequest): Promise<Record<string, unknown>> 
 
 function actorFrom(request: HttpRequest): string {
   return request.headers.get("x-phoenix-user") || "api";
+}
+
+function listOptionsFrom(request: HttpRequest): { top?: string | null; skip?: string | null; changedSince?: string | null } {
+  return {
+    top: request.query.get("top"),
+    skip: request.query.get("skip"),
+    changedSince: request.query.get("changedSince")
+  };
 }
 
 function errorResponse(error: unknown, context: InvocationContext): HttpResponseInit {
@@ -79,7 +88,7 @@ export async function operationalRecordsCollection(
         jsonBody: {
           ok: true,
           collection: collectionName,
-          data: await listOperationalRecords(collectionName, query),
+          data: await listOperationalRecords(collectionName, query, listOptionsFrom(request)),
           generatedAt: new Date().toISOString()
         }
       };
@@ -96,6 +105,25 @@ export async function operationalRecordsCollection(
         ok: true,
         id: created.id,
         data: created
+      }
+    };
+  } catch (error) {
+    return errorResponse(error, context);
+  }
+}
+
+export async function operationalRecordsHeads(
+  request: HttpRequest,
+  context: InvocationContext,
+  query: SqlQueryExecutor = queryParams
+): Promise<HttpResponseInit> {
+  try {
+    return {
+      status: 200,
+      jsonBody: {
+        ok: true,
+        data: await listOperationalRecordHeads(query),
+        generatedAt: new Date().toISOString()
       }
     };
   } catch (error) {
@@ -202,6 +230,13 @@ app.http("operationalRecordsRoot", {
   authLevel: "function",
   route: "records",
   handler: operationalRecordsRoot
+});
+
+app.http("operationalRecordsHeads", {
+  methods: ["GET"],
+  authLevel: "function",
+  route: "records/heads",
+  handler: operationalRecordsHeads
 });
 
 app.http("operationalRecordsCollection", {

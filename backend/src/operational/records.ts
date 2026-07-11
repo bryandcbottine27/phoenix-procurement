@@ -26,6 +26,9 @@ export const OPERATIONAL_COLLECTIONS = [
 ] as const;
 
 export type OperationalCollection = typeof OPERATIONAL_COLLECTIONS[number];
+const STATUS_LOG_CAP = 200;
+const DEFAULT_PAGE_SIZE = 500;
+const MAX_PAGE_SIZE = 1000;
 
 interface OperationalRecordRow {
   collectionName: string;
@@ -38,6 +41,16 @@ interface OperationalRecordRow {
 }
 
 export type OperationalRecordData = Record<string, unknown>;
+export interface OperationalRecordListOptions {
+  top?: unknown;
+  skip?: unknown;
+  changedSince?: unknown;
+}
+export interface OperationalRecordHead {
+  collectionName: string;
+  maxUpdatedAt: Date | string | null;
+  count: number;
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -84,6 +97,33 @@ function recordIdParam(id: string): ReturnType<typeof typedParam> {
   return typedParam(sql.NVarChar(120), id);
 }
 
+function parseNonNegativeInt(value: unknown, label: string, fallback?: number): number | undefined {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new OperationalBadRequestError(`${label} must be a non-negative integer.`);
+  return parsed;
+}
+
+function parseTop(value: unknown, fallback?: number): number | undefined {
+  const parsed = parseNonNegativeInt(value, "top", fallback);
+  if (parsed === undefined) return undefined;
+  if (parsed < 1) throw new OperationalBadRequestError("top must be greater than zero.");
+  return Math.min(parsed, MAX_PAGE_SIZE);
+}
+
+function changedSinceParam(value: unknown): ReturnType<typeof typedParam> | null {
+  if (value === undefined || value === null || value === "") return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) throw new OperationalBadRequestError("changedSince must be a valid date/time.");
+  return typedParam(sql.DateTime2(3), date);
+}
+
+function latestDate(a: Date | string | null, b: Date | string | null): Date | string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+}
+
 async function findRow(
   collectionName: OperationalCollection,
   id: string,
@@ -120,29 +160,75 @@ export async function getOperationalRecord(
 
 export async function listOperationalRecords(
   collectionName?: string,
-  query: SqlQueryExecutor = queryParams
+  query: SqlQueryExecutor = queryParams,
+  options: OperationalRecordListOptions = {}
 ): Promise<Record<string, OperationalRecordData[]> | OperationalRecordData[]> {
   const params: Record<string, unknown> = {};
-  let where = "";
   if (collectionName) {
     const collection = assertOperationalCollection(collectionName);
-    where = "WHERE collection_name = @collection_name";
+    const clauses = ["collection_name = @collection_name"];
     params.collection_name = collectionParam(collection);
+    const changedSince = changedSinceParam(options.changedSince);
+    if (changedSince) {
+      clauses.push("updated_at > @changed_since");
+      params.changed_since = changedSince;
+    }
+    const skip = parseNonNegativeInt(options.skip, "skip", 0) || 0;
+    const top = parseTop(options.top, collection === "status_log" ? STATUS_LOG_CAP : undefined);
+    let pagination = "";
+    if (top !== undefined || skip > 0) {
+      params.skip = typedParam(sql.Int, skip);
+      params.top = typedParam(sql.Int, top || DEFAULT_PAGE_SIZE);
+      pagination = "OFFSET @skip ROWS FETCH NEXT @top ROWS ONLY";
+    }
+    const result = await query<OperationalRecordRow>(`
+      SELECT
+        collection_name AS collectionName,
+        record_id AS recordId,
+        entity,
+        data_json AS dataJson,
+        archived,
+        created_at AS createdAt,
+        updated_at AS updatedAt
+      FROM dbo.operational_records
+      WHERE ${clauses.join(" AND ")}
+      ORDER BY updated_at DESC, record_id
+      ${pagination};
+    `, params);
+    return result.recordset.map(parseData);
   }
   const result = await query<OperationalRecordRow>(`
+    WITH ranked AS (
+      SELECT
+        collection_name AS collectionName,
+        record_id AS recordId,
+        entity,
+        data_json AS dataJson,
+        archived,
+        created_at AS createdAt,
+        updated_at AS updatedAt,
+        ROW_NUMBER() OVER (
+          PARTITION BY collection_name
+          ORDER BY updated_at DESC, record_id
+        ) AS rowNumber
+      FROM dbo.operational_records
+    )
     SELECT
-      collection_name AS collectionName,
-      record_id AS recordId,
+      collectionName,
+      recordId,
       entity,
-      data_json AS dataJson,
+      dataJson,
       archived,
-      created_at AS createdAt,
-      updated_at AS updatedAt
-    FROM dbo.operational_records
-    ${where}
-    ORDER BY collection_name, updated_at DESC, record_id;
-  `, params);
-  if (collectionName) return result.recordset.map(parseData);
+      createdAt,
+      updatedAt
+    FROM ranked
+    WHERE collectionName <> @status_log_collection
+       OR rowNumber <= @status_log_cap
+    ORDER BY collectionName, updatedAt DESC, recordId;
+  `, {
+    status_log_collection: collectionParam("status_log"),
+    status_log_cap: typedParam(sql.Int, STATUS_LOG_CAP)
+  });
 
   const grouped = Object.fromEntries(OPERATIONAL_COLLECTIONS.map(name => [name, []])) as Record<string, OperationalRecordData[]>;
   for (const row of result.recordset) {
@@ -150,6 +236,51 @@ export async function listOperationalRecords(
     bucket.push(parseData(row));
   }
   return grouped;
+}
+
+export async function listOperationalRecordHeads(
+  query: SqlQueryExecutor = queryParams
+): Promise<OperationalRecordHead[]> {
+  const heads = Object.fromEntries(OPERATIONAL_COLLECTIONS.map(name => [name, {
+    collectionName: name,
+    maxUpdatedAt: null,
+    count: 0
+  }])) as Record<string, OperationalRecordHead>;
+
+  const operational = await query<{ collectionName: string; maxUpdatedAt: Date | string | null; count: number }>(`
+    SELECT
+      collection_name AS collectionName,
+      MAX(updated_at) AS maxUpdatedAt,
+      COUNT_BIG(*) AS count
+    FROM dbo.operational_records
+    GROUP BY collection_name;
+  `);
+  for (const row of operational.recordset) {
+    if (!heads[row.collectionName]) continue;
+    heads[row.collectionName] = {
+      collectionName: row.collectionName,
+      maxUpdatedAt: row.maxUpdatedAt,
+      count: Number(row.count || 0)
+    };
+  }
+
+  const erpOrders = await query<{ maxUpdatedAt: Date | string | null; count: number }>(`
+    SELECT
+      MAX(updated_at) AS maxUpdatedAt,
+      COUNT_BIG(*) AS count
+    FROM dbo.orders;
+  `);
+  const erpHead = erpOrders.recordset[0];
+  if (erpHead) {
+    const current = heads.orders;
+    heads.orders = {
+      collectionName: "orders",
+      maxUpdatedAt: latestDate(current.maxUpdatedAt, erpHead.maxUpdatedAt),
+      count: Math.max(Number(current.count || 0), Number(erpHead.count || 0))
+    };
+  }
+
+  return OPERATIONAL_COLLECTIONS.map(name => heads[name]);
 }
 
 export async function createOperationalRecord(

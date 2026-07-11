@@ -16,6 +16,7 @@
     'documents', 'followups', 'issues', 'updateRequests', 'contactLog',
     'kpiSnapshot', 'status_log', 'system_config'
   ];
+  const collectionHeads = {};
 
   function enabled() {
     return window.__usesApiDataMode && window.__usesApiDataMode();
@@ -53,38 +54,96 @@
   function stateKey(collectionName) {
     return COLLECTION_STATE_KEY[collectionName] || collectionName;
   }
+  function maxUpdatedAt(rows) {
+    return (rows || []).reduce((max, row) => {
+      const value = row && row.updatedAt ? new Date(row.updatedAt).getTime() : 0;
+      return Number.isFinite(value) && value > max ? value : max;
+    }, 0);
+  }
+  function rememberHead(row) {
+    if (!row || !row.collectionName) return;
+    collectionHeads[row.collectionName] = {
+      maxUpdatedAt: row.maxUpdatedAt || null,
+      count: Number(row.count || 0)
+    };
+  }
+  function rememberHeads(rows) {
+    (Array.isArray(rows) ? rows : []).forEach(rememberHead);
+  }
+  function applyCollection(collectionName, rows) {
+    const data = Array.isArray(rows) ? rows : [];
+    if (collectionName === 'system_config') {
+      state.data.systemConfig = data;
+      const importConfig = data.find(item => item.configKey === 'erp_import_rules') || null;
+      const calendarConfig = data.find(item => item.configKey === 'business_calendars') || null;
+      state.importRuleConfigId = importConfig ? importConfig.id : null;
+      state.calendarConfigId = calendarConfig ? calendarConfig.id : null;
+      state.data.importRules = importConfig && Array.isArray(importConfig.rules) ? importConfig.rules : [];
+      state.data.businessCalendars = calendarConfig && Array.isArray(calendarConfig.calendars) ? calendarConfig.calendars : [];
+    } else if (collectionName === 'status_log') {
+      state.data.statusLog = data;
+      state.data.importRuns = data.filter(entry => entry.entryType === 'erp_import_run');
+    } else {
+      state.data[stateKey(collectionName)] = data;
+    }
+    const latestUpdatedAt = maxUpdatedAt(data);
+    collectionHeads[collectionName] = {
+      maxUpdatedAt: latestUpdatedAt ? new Date(latestUpdatedAt).toISOString() : null,
+      count: data.length
+    };
+  }
   function applySnapshot(payload) {
     const grouped = (payload && payload.data) || {};
     COLLECTIONS.forEach(collectionName => {
-      if (collectionName === 'system_config' || collectionName === 'status_log') return;
-      const key = stateKey(collectionName);
-      state.data[key] = Array.isArray(grouped[collectionName]) ? grouped[collectionName] : [];
+      applyCollection(collectionName, Array.isArray(grouped[collectionName]) ? grouped[collectionName] : []);
     });
-
-    const configs = Array.isArray(grouped.system_config) ? grouped.system_config : [];
-    state.data.systemConfig = configs;
-    const importConfig = configs.find(item => item.configKey === 'erp_import_rules') || null;
-    const calendarConfig = configs.find(item => item.configKey === 'business_calendars') || null;
-    state.importRuleConfigId = importConfig ? importConfig.id : null;
-    state.calendarConfigId = calendarConfig ? calendarConfig.id : null;
-    state.data.importRules = importConfig && Array.isArray(importConfig.rules) ? importConfig.rules : [];
-    state.data.businessCalendars = calendarConfig && Array.isArray(calendarConfig.calendars) ? calendarConfig.calendars : [];
-
-    const statusLog = Array.isArray(grouped.status_log) ? grouped.status_log : [];
-    state.data.statusLog = statusLog;
-    state.data.importRuns = statusLog.filter(entry => entry.entryType === 'erp_import_run');
   }
   async function loadAll() {
     const payload = await request('/records', { method: 'GET' });
     applySnapshot(payload);
+    const heads = await loadHeads();
+    rememberHeads(heads);
     return payload;
+  }
+  async function loadHeads() {
+    const payload = await request('/records/heads', { method: 'GET' });
+    return Array.isArray(payload.data) ? payload.data : [];
+  }
+  async function loadCollection(collectionName, options) {
+    const params = new URLSearchParams();
+    if (options && options.top != null) params.set('top', String(options.top));
+    if (options && options.skip != null) params.set('skip', String(options.skip));
+    if (options && options.changedSince) params.set('changedSince', String(options.changedSince));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const payload = await request(`/records/${encodeURIComponent(collectionName)}${suffix}`, { method: 'GET' });
+    applyCollection(collectionName, Array.isArray(payload.data) ? payload.data : []);
+    return payload;
+  }
+  async function refreshCollectionAfterWrite(collectionName) {
+    await loadCollection(collectionName);
+  }
+  async function pollChangedCollections() {
+    const heads = await loadHeads();
+    const changed = [];
+    for (const row of heads) {
+      const name = row.collectionName;
+      const previous = collectionHeads[name] || {};
+      const maxChanged = String(previous.maxUpdatedAt || '') !== String(row.maxUpdatedAt || '');
+      const countChanged = Number(previous.count || 0) !== Number(row.count || 0);
+      if (maxChanged || countChanged) {
+        await loadCollection(name);
+        rememberHead(row);
+        changed.push(name);
+      }
+    }
+    return changed;
   }
   async function createRecord(collectionName, data) {
     const payload = await request(`/records/${encodeURIComponent(collectionName)}`, {
       method: 'POST',
       body: JSON.stringify({ data })
     });
-    await loadAll();
+    await refreshCollectionAfterWrite(collectionName);
     return { id: payload.id };
   }
   async function updateRecord(collectionName, id, data, opts) {
@@ -95,7 +154,7 @@
         expectedUpdatedAt: opts && opts.expectedUpdatedAt
       })
     });
-    await loadAll();
+    await refreshCollectionAfterWrite(collectionName);
     return payload.id || id;
   }
   async function archiveRecord(collectionName, id, reason) {
@@ -103,7 +162,7 @@
       method: 'POST',
       body: JSON.stringify({ reason: reason || null })
     });
-    await loadAll();
+    await refreshCollectionAfterWrite(collectionName);
     return payload.id || id;
   }
   async function restoreRecord(collectionName, id) {
@@ -111,7 +170,7 @@
       method: 'POST',
       body: JSON.stringify({})
     });
-    await loadAll();
+    await refreshCollectionAfterWrite(collectionName);
     return payload.id || id;
   }
   async function nextCounter(counterKey) {
@@ -133,6 +192,7 @@
 
   window.PXApiClient = {
     enabled, loadAll, applySnapshot,
+    loadCollection, loadHeads, pollChangedCollections,
     createRecord, updateRecord, archiveRecord, restoreRecord, nextCounter, logStatusChange
   };
 })();

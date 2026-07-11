@@ -18,7 +18,7 @@ const APP_CONFIG = {
   dataMode: 'firebase', // 'firebase' = current demo/Firestore path; 'api' = internal SQL/API mode
   apiBaseUrl: '/api', // used when dataMode is 'api'; keep same-origin unless IT gives another URL
   apiFunctionKey: '', // optional x-functions-key for internal Azure Functions/API deployment
-  apiPollMs: 30000,
+  apiPollMs: 15000,
   internalDefaultRole: 'admin', // placeholder until IT confirms AD/SSO/local-user integration
   loginEmailDomain: '', // optional: if set, "bbottine" becomes "bbottine@your-domain"
   bcStructure: true, // Business Central top-nav layout. Set false for the classic sidebar.
@@ -2133,7 +2133,11 @@ function subscribeAllApi() {
   const pollMs = Math.max(0, Number((window.APP_CONFIG && window.APP_CONFIG.apiPollMs) || 0));
   if (pollMs) {
     const timer = setInterval(() => {
-      loadApiSnapshot().catch(err => console.warn('API data refresh skipped:', err && err.message));
+      window.PXApiClient.pollChangedCollections()
+        .then(changed => {
+          if (changed && changed.length) refreshAfterApiSnapshot();
+        })
+        .catch(err => console.warn('API data refresh skipped:', err && err.message));
     }, pollMs);
     state.unsubs.push(() => clearInterval(timer));
   }

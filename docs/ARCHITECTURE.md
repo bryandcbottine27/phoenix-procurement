@@ -1,6 +1,6 @@
 # Phoenix Procurement - Architecture
 
-Last reviewed: 2026-07-10
+Last reviewed: 2026-07-11
 
 ## Current technical stack
 
@@ -132,7 +132,9 @@ Current demo services used by the browser:
 Current browser behaviour:
 
 - In Firebase/demo mode, subscribes to Firestore collections with `onSnapshot`.
-- In API/internal mode, loads and polls `/api/records` through `PXApiClient`.
+- In API/internal mode, loads one initial `/api/records` snapshot through
+  `PXApiClient`, then polls `/api/records/heads` and reloads only changed
+  collections.
 - Writes through `PXStore` in both modes.
 - Generates client-side reports, exports, and Excel/CSV artifacts.
 - Reads Excel imports in the browser as a manual staging feed.
@@ -170,11 +172,14 @@ Backend v1 scaffold:
 - `backend/src/functions/unclassifiedWorklist.ts` exposes read-only `GET /api/worklists/unclassified` for actionable sync exception rows.
 - `backend/src/functions/orderAlertNotifications.ts` registers a disabled-by-default timer and a function-key preview endpoint for order-level requested-receipt/stale-sync notifications with repeat suppression.
 - `backend/src/functions/records.ts` exposes function-key protected operational
-  record routes for internal browser API mode.
+  record routes for internal browser API mode, including collection-level reads
+  with `top`/`skip`/`changedSince` and `GET /api/records/heads` for lightweight
+  polling.
 - `backend/src/functions/counters.ts` exposes function-key protected atomic
   counters for generated references in internal browser API mode.
 - `backend/src/operational/records.ts` implements the operational record allowlist,
-  JSON record mapping, soft archive/restore, and stale-write guard over SQL Server.
+  JSON record mapping, capped `status_log` reads, per-collection change heads,
+  soft archive/restore, and stale-write guard over SQL Server.
 - `backend/src/operational/counters.ts` validates counter keys and increments
   `dbo.app_counters` with parameterized SQL.
 - `backend/src/security/permissions.ts` mirrors the browser `REF.permissions`
@@ -310,7 +315,7 @@ Current backend HTTP API scaffold:
 - `GET /api/analytics/otif-risk` in `backend/src/functions/otifRisk.ts`, function-auth, returns an order-only OTIF early-warning proxy with explicit supplier/shipment/GRN coverage exclusions.
 - `GET /api/worklists/unclassified` in `backend/src/functions/unclassifiedWorklist.ts`, function-auth, returns actionable sync exception worklist rows for future admin remediation screens.
 - `GET /api/notifications/order-alerts/preview` in `backend/src/functions/orderAlertNotifications.ts`, function-auth, returns a dry-run summary of order alert digests without Graph delivery or sent-state writes.
-- `GET /api/records`, `GET/POST /api/records/{collection}`, `PATCH /api/records/{collection}/{id}`, `POST /api/records/{collection}/{id}/archive`, and `POST /api/records/{collection}/{id}/restore` in `backend/src/functions/records.ts`, function-auth, provide the internal browser operational store.
+- `GET /api/records`, `GET /api/records/heads`, `GET/POST /api/records/{collection}`, `PATCH /api/records/{collection}/{id}`, `POST /api/records/{collection}/{id}/archive`, and `POST /api/records/{collection}/{id}/restore` in `backend/src/functions/records.ts`, function-auth, provide the internal browser operational store.
 - `POST /api/counters/{counterKey}/next` in `backend/src/functions/counters.ts`,
   function-auth, provides atomic generated-reference counters for API mode.
 - `POST /api/sync/purchase-orders` in `backend/src/functions/syncPurchaseOrders.ts`, function-auth, runs the fixture-backed purchase-order sync.
