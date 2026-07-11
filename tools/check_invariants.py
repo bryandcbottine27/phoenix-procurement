@@ -156,8 +156,11 @@ def main():
         integrity_failures.append("duplicate shipment IDs must be hard-blocked")
     if "Receipt result shows goods were received" not in validators or "linked GRN date" not in validators:
         integrity_failures.append("received shipment results must require a GRN date/link")
-    if "shipment.grnDate || linkedGrn" not in core:
-        integrity_failures.append("Await GRN action must require actual GRN evidence")
+    if ("window.PXReceiptControl" not in core
+            or "rc.grnCountsAsReceipt(receipt)" not in core
+            or "receipt?.grnRef || receipt?.grnNumber" not in core
+            or "shipment.grnDate || shipment.grnNumber || linkedGrn" not in core):
+        integrity_failures.append("Await GRN action must require central receipt-control evidence")
     if "PXReceiptControl.grnCountsAsReceipt" not in order_render or "r.grnCountsAsReceipt" in order_render:
         integrity_failures.append("order Awaiting/Overdue filters must use the GRN helper")
     if "allocateMilestoneAmounts" not in core or "allocateMilestoneAmounts(orderAmount, schedule)" not in core:

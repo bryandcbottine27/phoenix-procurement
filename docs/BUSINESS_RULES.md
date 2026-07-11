@@ -151,8 +151,8 @@ GRN row fields:
 Validation/control:
 
 - Shipment status is required on every shipment record.
-- A received shipment result, such as fully received, partially received, short, missing, damaged, or over received, must have a shipment GRN date or a linked order GRN date.
-- A shipment follow-up action of "Await GRN / store confirmation" is not considered processed by receipt result text alone; it requires a shipment GRN date or linked order GRN date.
+- A received shipment result, such as fully received, partially received, short, missing, damaged, or over received, must have shipment GRN evidence or linked order GRN evidence.
+- A shipment follow-up action of "Await GRN / store confirmation" is not considered processed by receipt result text alone; it requires central receipt-control evidence such as a shipment GRN date/number or a linked order GRN date/reference/number.
 - Shipment references must be unique, including archived records, to avoid S1/S2 collision if a shipment is restored.
 
 Shipment record rules:
@@ -310,6 +310,8 @@ Confirmed principles:
 - Internal stakeholders can view relevant orders, shipments, documents, issues,
   and update requests, but they do not receive the exports/outbound or reports
   datasets.
+- Delegation is active only when an officer has both a delegate target and a
+  non-expired delegate-until date. A missing end date is treated as inactive.
 
 Request Update visibility:
 
@@ -330,6 +332,7 @@ Confirmed:
 - `status_log` stores status/change/import-history entries.
 - Order amendments are stored in the order `amendments` array.
 - Claims are stored in the order `claims` array.
+- Claim amounts must be zero or positive. Negative claim values are not valid operational data.
 - Creates/updates through `PXStore` stamp created/updated metadata.
 - Soft archive should be used for business records.
 

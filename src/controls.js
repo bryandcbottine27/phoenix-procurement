@@ -73,10 +73,17 @@
   const STATUS_LABELS = { open: 'Open', under_review: 'Under Review', resolved: 'Resolved', rejected: 'Rejected' };
   const STATUS_CLS = { open: 'danger', under_review: 'warn', resolved: 'success', rejected: 'neutral' };
 
+  function parseClaimAmount(value) {
+    if (value == null || value === '') return null;
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount < 0) return undefined;
+    return amount;
+  }
+
   function newClaim(opts) {
     return {
       id: `clm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      type: opts.type || 'other', amount: opts.amount || null, currency: opts.currency || 'MUR',
+      type: opts.type || 'other', amount: parseClaimAmount(opts.amount), currency: opts.currency || 'MUR',
       status: 'open', raisedDate: opts.raisedDate || new Date().toISOString().slice(0, 10),
       resolvedDate: null, raisedBy: opts.raisedBy || '', assignedTo: opts.assignedTo || '', note: opts.note || ''
     };
@@ -145,6 +152,10 @@
     if (btn) btn.addEventListener('click', async () => {
       const fd = new FormData(document.getElementById('claim-form'));
       const claim = newClaim({ type: fd.get('type'), amount: fd.get('amount') || null, currency: fd.get('currency'), raisedDate: fd.get('raisedDate'), raisedBy: fd.get('raisedBy'), assignedTo: fd.get('assignedTo'), note: fd.get('note') });
+      if (claim.amount === undefined) {
+        window.PXUtils.toast('Claim amount cannot be negative.', 'danger');
+        return;
+      }
       claim.status = fd.get('status') || 'open';
       const existing = Array.isArray(o.claims) ? o.claims : [];
       await window.PXStore.updateRecord('orders', orderId, { claims: [...existing, claim] });
@@ -186,7 +197,12 @@
     const btn = document.getElementById('save-claim-edit');
     if (btn) btn.addEventListener('click', async () => {
       const fd = new FormData(document.getElementById('claim-edit-form'));
-      const updated = { ...c, type: fd.get('type'), status: fd.get('status'), amount: fd.get('amount') || null, currency: fd.get('currency'), raisedDate: fd.get('raisedDate'), resolvedDate: fd.get('resolvedDate') || null, raisedBy: fd.get('raisedBy'), assignedTo: fd.get('assignedTo'), note: fd.get('note') };
+      const amount = parseClaimAmount(fd.get('amount'));
+      if (amount === undefined) {
+        window.PXUtils.toast('Claim amount cannot be negative.', 'danger');
+        return;
+      }
+      const updated = { ...c, type: fd.get('type'), status: fd.get('status'), amount, currency: fd.get('currency'), raisedDate: fd.get('raisedDate'), resolvedDate: fd.get('resolvedDate') || null, raisedBy: fd.get('raisedBy'), assignedTo: fd.get('assignedTo'), note: fd.get('note') };
       const claims = [...o.claims]; claims[idx] = updated;
       await window.PXStore.updateRecord('orders', orderId, { claims });
       window.closeModal();
@@ -204,10 +220,9 @@
     if (!st || !code) return null;
     const officer = (st.data.officers || []).find(o => o.code === code);
     if (!officer || !officer.delegateToCode) return null;
-    if (officer.delegateUntil) {
-      const until = new Date(officer.delegateUntil); until.setHours(23, 59, 59, 999);
-      if (new Date() > until) return null;
-    }
+    if (!officer.delegateUntil) return null;
+    const until = new Date(officer.delegateUntil); until.setHours(23, 59, 59, 999);
+    if (new Date() > until) return null;
     return { delegateTo: officer.delegateToCode, reason: officer.delegateReason || '' };
   }
   function delegatedTo(code) {

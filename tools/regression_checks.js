@@ -114,6 +114,10 @@ function evaluateLiteral(literal, label) {
 }
 
 const core = read('src/core.js');
+const controlsSource = read('src/controls.js');
+const bcCardPageSource = read('src/bcCardPage.js');
+const teamWorkSource = read('src/teamWork.js');
+const erpImportSource = read('src/modules/reports/erpImport.js');
 const permissions = evaluateLiteral(matchingLiteral(core, 'permissions:'), 'REF.permissions');
 const viewAccess = evaluateLiteral(matchingLiteral(core, 'viewAccess:'), 'REF.viewAccess');
 
@@ -190,6 +194,7 @@ check('unknown production role has no navigation', viewLevel('made_up_role', 'da
 check('production no-role fallback is no_access',
   /return\s+isDemoMode\(\)\s*\?\s*'admin'\s*:\s*'no_access'/.test(core));
 check('no_access is intentionally absent from permission matrix', !Object.prototype.hasOwnProperty.call(permissions, 'no_access'));
+check('dead logisticsCost permission key is absent', !core.includes('logisticsCost'));
 
 // --- Shipment sequence contracts ---
 const shipmentSequenceSource = matchingFunction(core, 'shipmentSequence');
@@ -247,6 +252,31 @@ check('payment RFP numbering uses API-mode SQL counter',
   paymentsServiceSource.includes('window.__usesApiDataMode')
   && paymentsServiceSource.includes('window.PXApiClient.nextCounter')
   && paymentsServiceSource.indexOf('window.__usesApiDataMode') < paymentsServiceSource.indexOf('runTransaction(db'));
+check('Await GRN follow-up uses central receipt control and GRN references',
+  core.includes('window.PXReceiptControl')
+  && core.includes('rc.grnCountsAsReceipt(receipt)')
+  && core.includes('receipt?.grnRef || receipt?.grnNumber')
+  && core.includes('shipment.grnDate || shipment.grnNumber || linkedGrn'));
+check('duplicate supplier warning escapes the supplier name',
+  core.includes('escapeHtml(sim.supplier)'));
+check('Business Central card page uses PXUtils formatters',
+  !/function\s+(esc|fmtDate|fmtMoney)\s*\(/.test(bcCardPageSource)
+  && bcCardPageSource.includes('const { escapeHtml, fmtDate, fmtMoney } = window.PXUtils'));
+check('Team Work uses PXUtils helpers instead of local formatters',
+  !/function\s+(esc|fmtDate|fmtMoney)\s*\(/.test(teamWorkSource)
+  && teamWorkSource.includes('const { escapeHtml, fmtDate } = U()'));
+check('API mode blocks Firestore purge code path',
+  erpImportSource.includes('window.__usesApiDataMode')
+  && erpImportSource.includes('Firestore purge is disabled in API data mode.')
+  && erpImportSource.indexOf('window.__usesApiDataMode') < erpImportSource.indexOf('fs.getDocs'));
+check('Claims reject negative amounts before save',
+  controlsSource.includes('function parseClaimAmount')
+  && controlsSource.includes('amount < 0')
+  && controlsSource.includes('Claim amount cannot be negative.')
+  && controlsSource.includes('claim.amount === undefined'));
+check('Delegation without delegateUntil is inactive consistently',
+  controlsSource.includes('if (!officer.delegateUntil) return null;')
+  && /delegateToCode === code && o\.delegateUntil/.test(controlsSource));
 
 // --- Firestore rule drift checks ---
 const authRules = read('docs/FIRESTORE_RULES/firestore.rules.authenticated');

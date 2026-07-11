@@ -6,9 +6,6 @@
   const S = () => window.__state;
   const U = () => window.PXUtils || {};
 
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function fmtDate(d){ return (U().fmtDate ? U().fmtDate(d) : (d ? new Date(d).toLocaleDateString() : '—')); }
-
   function streamOf() {
     return (typeof window.__roleStream === 'function') ? window.__roleStream() : null;
   }
@@ -37,6 +34,7 @@
   }
 
   window.__renderers['teamwork'] = function () {
+    const { escapeHtml, fmtDate } = U();
     const el = document.getElementById('view-teamwork');
     if (!el) return;
 
@@ -67,14 +65,14 @@
     const overdue = orders.filter(o => o.requestedReceiptDate && new Date(o.requestedReceiptDate) < today
       && !(o.deliveryDate || o.actualReceiptDate));
 
-    const open = (id) => `onclick="window.openOrderDetail && window.openOrderDetail('${esc(id)}')" style="cursor:pointer"`;
+    const open = (id) => `onclick="window.openOrderDetail && window.openOrderDetail('${escapeHtml(id)}')" style="cursor:pointer"`;
 
     const workloadRows = officerCodes.map(code => {
       const list = byOfficer[code];
       const od = list.filter(o => o.requestedReceiptDate && new Date(o.requestedReceiptDate) < today && !(o.deliveryDate||o.actualReceiptDate)).length;
       const fu = list.filter(o => o.nextSupplierFollowupDate && new Date(o.nextSupplierFollowupDate) <= today).length;
       return `<tr>
-        <td>${esc(officerName(code))}</td>
+        <td>${escapeHtml(officerName(code))}</td>
         <td class="num">${list.length}</td>
         <td class="num">${od ? `<span class="badge danger" style="font-size:10px">${od}</span>` : '0'}</td>
         <td class="num">${fu ? `<span class="badge warn" style="font-size:10px">${fu}</span>` : '0'}</td>
@@ -94,7 +92,7 @@
     el.innerHTML = `
       <div class="page-head"><div class="title">
         <h1>Team Work</h1>
-        <span class="desc">${esc(streamLabel)} · ${orders.length} open order(s) across ${officerCodes.length} officer(s)</span>
+        <span class="desc">${escapeHtml(streamLabel)} · ${orders.length} open order(s) across ${officerCodes.length} officer(s)</span>
       </div></div>
 
       <div class="card" style="margin-bottom:14px">
@@ -106,11 +104,11 @@
       </div>
 
       ${listCard('Overdue receipts — whole team', overdue,
-        o => `<tr ${open(o.orderId)}><td class="mono">${esc(o.orderId)}</td><td class="truncate">${esc(o.supplier||'')}</td><td>${esc(officerName(o.officerCode))}</td><td>${fmtDate(o.requestedReceiptDate)}</td></tr>`,
+        o => `<tr ${open(o.orderId)}><td class="mono">${escapeHtml(o.orderId)}</td><td class="truncate">${escapeHtml(o.supplier||'')}</td><td>${escapeHtml(officerName(o.officerCode))}</td><td>${fmtDate(o.requestedReceiptDate)}</td></tr>`,
         ['Order','Supplier','Officer','Requested receipt'])}
 
       ${listCard('Follow-ups due — whole team', followUpsDue,
-        o => `<tr ${open(o.orderId)}><td class="mono">${esc(o.orderId)}</td><td class="truncate">${esc(o.supplier||'')}</td><td>${esc(officerName(o.officerCode))}</td><td>${fmtDate(o.nextSupplierFollowupDate)}</td></tr>`,
+        o => `<tr ${open(o.orderId)}><td class="mono">${escapeHtml(o.orderId)}</td><td class="truncate">${escapeHtml(o.supplier||'')}</td><td>${escapeHtml(officerName(o.officerCode))}</td><td>${fmtDate(o.nextSupplierFollowupDate)}</td></tr>`,
         ['Order','Supplier','Officer','Next follow-up'])}
     `;
   };

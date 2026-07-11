@@ -26,12 +26,9 @@
     return { head, body };
   }
 
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function fmtMoney(n, cur){ if (n==null||isNaN(n)) return '—'; return (cur?cur+' ':'') + Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
-  function fmtDate(d){ return (window.PXUtils&&window.PXUtils.fmtDate)?window.PXUtils.fmtDate(d):(d?new Date(d).toLocaleDateString():'—'); }
-
   // Build the "At a glance" FactBox from the current order context.
   function buildFactBox() {
+    const { escapeHtml, fmtDate, fmtMoney } = window.PXUtils;
     const ctx = window.__cardContext;
     if (!ctx || ctx.type !== 'order' || !ctx.record) return '';
     const o = ctx.record;
@@ -46,7 +43,7 @@
       otif = days > 0 ? `<span style="color:var(--danger)">${days}d overdue</span>` : `${Math.abs(days)}d to go`;
     } else if (received) { otif = '<span style="color:var(--success)">received</span>'; }
     const ships = ctx.linkedShipments || [];
-    const shipStatus = ships.length ? esc(ships[0].status || ships[0].shipmentStatus || 'in progress') : '—';
+    const shipStatus = ships.length ? escapeHtml(ships[0].status || ships[0].shipmentStatus || 'in progress') : '—';
 
     return `<aside class="factbox">
       <div class="factbox-head"><div class="t">At a glance</div></div>
@@ -59,8 +56,8 @@
       <div class="factbox-sec">
         <div class="lbl">Order</div>
         <div class="fb-row"><span class="k">Amount</span><span class="v">${fmtMoney(o.amount, o.currency)}</span></div>
-        <div class="fb-row"><span class="k">Supplier</span><span class="v" style="max-width:150px;text-align:right">${esc(o.supplier||'—')}</span></div>
-        <div class="fb-row"><span class="k">Officer</span><span class="v">${esc(o.officerCode||'—')}</span></div>
+        <div class="fb-row"><span class="k">Supplier</span><span class="v" style="max-width:150px;text-align:right">${escapeHtml(o.supplier||'—')}</span></div>
+        <div class="fb-row"><span class="k">Officer</span><span class="v">${escapeHtml(o.officerCode||'—')}</span></div>
         <div class="fb-row"><span class="k">Req. receipt</span><span class="v">${o.requestedReceiptDate?fmtDate(o.requestedReceiptDate):'—'}</span></div>
       </div>
     </aside>`;

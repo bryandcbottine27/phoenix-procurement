@@ -621,8 +621,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     sc_manager: {   // Supply Chain Manager
       orders:         ['view','create','edit','archive'],
@@ -637,8 +636,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     sc_officer: {   // Supply Chain Officer (Specialist)
       orders:         ['view','create','edit'],
@@ -653,8 +651,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_technical_manager: {   // Procurement Manager/Supervisor (Technical & Service)
       orders:         ['view','create','edit','archive'],
@@ -669,8 +666,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     procurement_technical_officer: {   // Procurement Officer (Technical & Service)
       orders:         ['view','create','edit'],
@@ -685,8 +681,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_indirect_manager: {   // Procurement Manager/Supervisor (Indirect)
       orders:         ['view','create','edit','archive'],
@@ -701,8 +696,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     procurement_indirect_officer: {   // Procurement Officer (Indirect)
       orders:         ['view','create','edit'],
@@ -717,8 +711,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_technical_supervisor: {   // Procurement Supervisor (Technical & Service) — officer baseline (extras added separately)
       orders:         ['view','create','edit'],
@@ -733,8 +726,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_indirect_supervisor: {   // Procurement Supervisor (Indirect) — officer baseline (extras added separately)
       orders:         ['view','create','edit'],
@@ -749,8 +741,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     sc_supervisor: {   // Supply Chain Supervisor (Specialist) — officer baseline (extras added separately)
       orders:         ['view','create','edit'],
@@ -765,8 +756,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
 
     logistics_manager: {   // Logistics Manager
@@ -782,8 +772,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       ['view','create','edit'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit']
     },
     logistics_officer: {   // Logistics Officer
       orders:         ['view'],
@@ -798,8 +787,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     demand_supervisor: {   // Demand Planning Supervisor
       orders:         ['view'],
@@ -814,8 +802,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     demand_officer: {   // Demand Planning Officer
       orders:         ['view'],
@@ -830,8 +817,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     finance: {   // Finance (was accounts)
       orders:         ['view'],
@@ -846,8 +832,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     stakeholder: {   // Internal Stakeholder (Claimant) — read-only + raise update requests
       orders:         ['view'],
@@ -862,8 +847,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        [],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
   },
 
@@ -1196,13 +1180,17 @@ function shipmentFollowupActionOpen(shipment, data = state.data) {
   if (action === "Await GRN / store confirmation") {
     const order = shipment.orderId ? (data.orders || []).find(o => o.orderId === shipment.orderId) : null;
     const keys = [shipment.id, shipment.shipmentId].filter(Boolean).map(String);
-    const linkedGrn = order && Array.isArray(order.receipts) && order.receipts.some(receipt => {
-      const status = String(receipt?.status || '').toLowerCase();
+    const grnCountsAsReceipt = receipt => {
+      const rc = window.PXReceiptControl;
+      if (rc && typeof rc.grnCountsAsReceipt === 'function') return rc.grnCountsAsReceipt(receipt);
+      const status = String(receipt?.status || '').trim().toLowerCase();
       return status !== 'pending' && status !== 'cancelled'
-        && keys.includes(String(receipt.shipmentId || ''))
-        && !!(receipt.grnDate || receipt.actualReceiptDate);
+        && !!(receipt?.grnDate || receipt?.actualReceiptDate || receipt?.grnRef || receipt?.grnNumber);
+    };
+    const linkedGrn = order && Array.isArray(order.receipts) && order.receipts.some(receipt => {
+      return grnCountsAsReceipt(receipt) && keys.includes(String(receipt.shipmentId || ''));
     });
-    return !(shipment.grnDate || linkedGrn);
+    return !(shipment.grnDate || shipment.grnNumber || linkedGrn);
   }
   return true;
 }
@@ -2721,7 +2709,7 @@ function checkOrderDuplicates(data, allOrders, isEdit, currentId) {
   // Similar supplier + same amount within recent — possible re-entry
   if (data.supplier && data.amount) {
     const sim = others.find(o => o.supplier && stringSimilarity(o.supplier, data.supplier) > 0.85 && Number(o.amount) === Number(data.amount) && o.currency === data.currency && !o.isClosed);
-    if (sim) warnings.push(`An open order with a very similar supplier ("${sim.supplier}") and the same amount (${data.currency} ${data.amount}) already exists: ${sim.orderId}. Possible duplicate?`);
+    if (sim) warnings.push(`An open order with a very similar supplier ("${escapeHtml(sim.supplier)}") and the same amount (${data.currency} ${data.amount}) already exists: ${sim.orderId}. Possible duplicate?`);
   }
   return warnings;
 }

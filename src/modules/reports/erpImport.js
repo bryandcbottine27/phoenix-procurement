@@ -635,6 +635,9 @@ async function purgeAllData(opts = {}) {
   }
   _purgeCancel = false;
   const { onProgress } = opts;
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    throw new Error('Firestore purge is disabled in API data mode.');
+  }
   const fs = window.__fs, db = window.__db;
   if (!fs || !db) throw new Error('Firestore not available.');
   let done = 0, failed = 0;

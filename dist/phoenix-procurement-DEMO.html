@@ -3777,8 +3777,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     sc_manager: {   // Supply Chain Manager
       orders:         ['view','create','edit','archive'],
@@ -3793,8 +3792,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     sc_officer: {   // Supply Chain Officer (Specialist)
       orders:         ['view','create','edit'],
@@ -3809,8 +3807,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_technical_manager: {   // Procurement Manager/Supervisor (Technical & Service)
       orders:         ['view','create','edit','archive'],
@@ -3825,8 +3822,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     procurement_technical_officer: {   // Procurement Officer (Technical & Service)
       orders:         ['view','create','edit'],
@@ -3841,8 +3837,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_indirect_manager: {   // Procurement Manager/Supervisor (Indirect)
       orders:         ['view','create','edit','archive'],
@@ -3857,8 +3852,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       ['view'],
       reports:        ['view'],
-      erprecon:       ['view','create','edit','archive'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit','archive']
     },
     procurement_indirect_officer: {   // Procurement Officer (Indirect)
       orders:         ['view','create','edit'],
@@ -3873,8 +3867,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_technical_supervisor: {   // Procurement Supervisor (Technical & Service) — officer baseline (extras added separately)
       orders:         ['view','create','edit'],
@@ -3889,8 +3882,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     procurement_indirect_supervisor: {   // Procurement Supervisor (Indirect) — officer baseline (extras added separately)
       orders:         ['view','create','edit'],
@@ -3905,8 +3897,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     sc_supervisor: {   // Supply Chain Supervisor (Specialist) — officer baseline (extras added separately)
       orders:         ['view','create','edit'],
@@ -3921,8 +3912,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
 
     logistics_manager: {   // Logistics Manager
@@ -3938,8 +3928,7 @@ const REF = {
       updateRequests: ['view','create','edit','archive'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       ['view','create','edit'],
-      logisticsCost: []
+      erprecon:       ['view','create','edit']
     },
     logistics_officer: {   // Logistics Officer
       orders:         ['view'],
@@ -3954,8 +3943,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     demand_supervisor: {   // Demand Planning Supervisor
       orders:         ['view'],
@@ -3970,8 +3958,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     demand_officer: {   // Demand Planning Officer
       orders:         ['view'],
@@ -3986,8 +3973,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     finance: {   // Finance (was accounts)
       orders:         ['view'],
@@ -4002,8 +3988,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        ['view'],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
     stakeholder: {   // Internal Stakeholder (Claimant) — read-only + raise update requests
       orders:         ['view'],
@@ -4018,8 +4003,7 @@ const REF = {
       updateRequests: ['view','create','edit'],
       officers:       [],
       reports:        [],
-      erprecon:       [],
-      logisticsCost: []
+      erprecon:       []
     },
   },
 
@@ -4352,13 +4336,17 @@ function shipmentFollowupActionOpen(shipment, data = state.data) {
   if (action === "Await GRN / store confirmation") {
     const order = shipment.orderId ? (data.orders || []).find(o => o.orderId === shipment.orderId) : null;
     const keys = [shipment.id, shipment.shipmentId].filter(Boolean).map(String);
-    const linkedGrn = order && Array.isArray(order.receipts) && order.receipts.some(receipt => {
-      const status = String(receipt?.status || '').toLowerCase();
+    const grnCountsAsReceipt = receipt => {
+      const rc = window.PXReceiptControl;
+      if (rc && typeof rc.grnCountsAsReceipt === 'function') return rc.grnCountsAsReceipt(receipt);
+      const status = String(receipt?.status || '').trim().toLowerCase();
       return status !== 'pending' && status !== 'cancelled'
-        && keys.includes(String(receipt.shipmentId || ''))
-        && !!(receipt.grnDate || receipt.actualReceiptDate);
+        && !!(receipt?.grnDate || receipt?.actualReceiptDate || receipt?.grnRef || receipt?.grnNumber);
+    };
+    const linkedGrn = order && Array.isArray(order.receipts) && order.receipts.some(receipt => {
+      return grnCountsAsReceipt(receipt) && keys.includes(String(receipt.shipmentId || ''));
     });
-    return !(shipment.grnDate || linkedGrn);
+    return !(shipment.grnDate || shipment.grnNumber || linkedGrn);
   }
   return true;
 }
@@ -5877,7 +5865,7 @@ function checkOrderDuplicates(data, allOrders, isEdit, currentId) {
   // Similar supplier + same amount within recent — possible re-entry
   if (data.supplier && data.amount) {
     const sim = others.find(o => o.supplier && stringSimilarity(o.supplier, data.supplier) > 0.85 && Number(o.amount) === Number(data.amount) && o.currency === data.currency && !o.isClosed);
-    if (sim) warnings.push(`An open order with a very similar supplier ("${sim.supplier}") and the same amount (${data.currency} ${data.amount}) already exists: ${sim.orderId}. Possible duplicate?`);
+    if (sim) warnings.push(`An open order with a very similar supplier ("${escapeHtml(sim.supplier)}") and the same amount (${data.currency} ${data.amount}) already exists: ${sim.orderId}. Possible duplicate?`);
   }
   return warnings;
 }
@@ -9092,10 +9080,17 @@ $('#print-back').addEventListener('click', () => {
   const STATUS_LABELS = { open: 'Open', under_review: 'Under Review', resolved: 'Resolved', rejected: 'Rejected' };
   const STATUS_CLS = { open: 'danger', under_review: 'warn', resolved: 'success', rejected: 'neutral' };
 
+  function parseClaimAmount(value) {
+    if (value == null || value === '') return null;
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || amount < 0) return undefined;
+    return amount;
+  }
+
   function newClaim(opts) {
     return {
       id: `clm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      type: opts.type || 'other', amount: opts.amount || null, currency: opts.currency || 'MUR',
+      type: opts.type || 'other', amount: parseClaimAmount(opts.amount), currency: opts.currency || 'MUR',
       status: 'open', raisedDate: opts.raisedDate || new Date().toISOString().slice(0, 10),
       resolvedDate: null, raisedBy: opts.raisedBy || '', assignedTo: opts.assignedTo || '', note: opts.note || ''
     };
@@ -9164,6 +9159,10 @@ $('#print-back').addEventListener('click', () => {
     if (btn) btn.addEventListener('click', async () => {
       const fd = new FormData(document.getElementById('claim-form'));
       const claim = newClaim({ type: fd.get('type'), amount: fd.get('amount') || null, currency: fd.get('currency'), raisedDate: fd.get('raisedDate'), raisedBy: fd.get('raisedBy'), assignedTo: fd.get('assignedTo'), note: fd.get('note') });
+      if (claim.amount === undefined) {
+        window.PXUtils.toast('Claim amount cannot be negative.', 'danger');
+        return;
+      }
       claim.status = fd.get('status') || 'open';
       const existing = Array.isArray(o.claims) ? o.claims : [];
       await window.PXStore.updateRecord('orders', orderId, { claims: [...existing, claim] });
@@ -9205,7 +9204,12 @@ $('#print-back').addEventListener('click', () => {
     const btn = document.getElementById('save-claim-edit');
     if (btn) btn.addEventListener('click', async () => {
       const fd = new FormData(document.getElementById('claim-edit-form'));
-      const updated = { ...c, type: fd.get('type'), status: fd.get('status'), amount: fd.get('amount') || null, currency: fd.get('currency'), raisedDate: fd.get('raisedDate'), resolvedDate: fd.get('resolvedDate') || null, raisedBy: fd.get('raisedBy'), assignedTo: fd.get('assignedTo'), note: fd.get('note') };
+      const amount = parseClaimAmount(fd.get('amount'));
+      if (amount === undefined) {
+        window.PXUtils.toast('Claim amount cannot be negative.', 'danger');
+        return;
+      }
+      const updated = { ...c, type: fd.get('type'), status: fd.get('status'), amount, currency: fd.get('currency'), raisedDate: fd.get('raisedDate'), resolvedDate: fd.get('resolvedDate') || null, raisedBy: fd.get('raisedBy'), assignedTo: fd.get('assignedTo'), note: fd.get('note') };
       const claims = [...o.claims]; claims[idx] = updated;
       await window.PXStore.updateRecord('orders', orderId, { claims });
       window.closeModal();
@@ -9223,10 +9227,9 @@ $('#print-back').addEventListener('click', () => {
     if (!st || !code) return null;
     const officer = (st.data.officers || []).find(o => o.code === code);
     if (!officer || !officer.delegateToCode) return null;
-    if (officer.delegateUntil) {
-      const until = new Date(officer.delegateUntil); until.setHours(23, 59, 59, 999);
-      if (new Date() > until) return null;
-    }
+    if (!officer.delegateUntil) return null;
+    const until = new Date(officer.delegateUntil); until.setHours(23, 59, 59, 999);
+    if (new Date() > until) return null;
     return { delegateTo: officer.delegateToCode, reason: officer.delegateReason || '' };
   }
   function delegatedTo(code) {
@@ -22564,6 +22567,9 @@ async function purgeAllData(opts = {}) {
   }
   _purgeCancel = false;
   const { onProgress } = opts;
+  if (window.__usesApiDataMode && window.__usesApiDataMode()) {
+    throw new Error('Firestore purge is disabled in API data mode.');
+  }
   const fs = window.__fs, db = window.__db;
   if (!fs || !db) throw new Error('Firestore not available.');
   let done = 0, failed = 0;
@@ -26204,9 +26210,6 @@ window.PhoenixERP = {
   const S = () => window.__state;
   const U = () => window.PXUtils || {};
 
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function fmtDate(d){ return (U().fmtDate ? U().fmtDate(d) : (d ? new Date(d).toLocaleDateString() : '—')); }
-
   function streamOf() {
     return (typeof window.__roleStream === 'function') ? window.__roleStream() : null;
   }
@@ -26235,6 +26238,7 @@ window.PhoenixERP = {
   }
 
   window.__renderers['teamwork'] = function () {
+    const { escapeHtml, fmtDate } = U();
     const el = document.getElementById('view-teamwork');
     if (!el) return;
 
@@ -26265,14 +26269,14 @@ window.PhoenixERP = {
     const overdue = orders.filter(o => o.requestedReceiptDate && new Date(o.requestedReceiptDate) < today
       && !(o.deliveryDate || o.actualReceiptDate));
 
-    const open = (id) => `onclick="window.openOrderDetail && window.openOrderDetail('${esc(id)}')" style="cursor:pointer"`;
+    const open = (id) => `onclick="window.openOrderDetail && window.openOrderDetail('${escapeHtml(id)}')" style="cursor:pointer"`;
 
     const workloadRows = officerCodes.map(code => {
       const list = byOfficer[code];
       const od = list.filter(o => o.requestedReceiptDate && new Date(o.requestedReceiptDate) < today && !(o.deliveryDate||o.actualReceiptDate)).length;
       const fu = list.filter(o => o.nextSupplierFollowupDate && new Date(o.nextSupplierFollowupDate) <= today).length;
       return `<tr>
-        <td>${esc(officerName(code))}</td>
+        <td>${escapeHtml(officerName(code))}</td>
         <td class="num">${list.length}</td>
         <td class="num">${od ? `<span class="badge danger" style="font-size:10px">${od}</span>` : '0'}</td>
         <td class="num">${fu ? `<span class="badge warn" style="font-size:10px">${fu}</span>` : '0'}</td>
@@ -26292,7 +26296,7 @@ window.PhoenixERP = {
     el.innerHTML = `
       <div class="page-head"><div class="title">
         <h1>Team Work</h1>
-        <span class="desc">${esc(streamLabel)} · ${orders.length} open order(s) across ${officerCodes.length} officer(s)</span>
+        <span class="desc">${escapeHtml(streamLabel)} · ${orders.length} open order(s) across ${officerCodes.length} officer(s)</span>
       </div></div>
 
       <div class="card" style="margin-bottom:14px">
@@ -26304,11 +26308,11 @@ window.PhoenixERP = {
       </div>
 
       ${listCard('Overdue receipts — whole team', overdue,
-        o => `<tr ${open(o.orderId)}><td class="mono">${esc(o.orderId)}</td><td class="truncate">${esc(o.supplier||'')}</td><td>${esc(officerName(o.officerCode))}</td><td>${fmtDate(o.requestedReceiptDate)}</td></tr>`,
+        o => `<tr ${open(o.orderId)}><td class="mono">${escapeHtml(o.orderId)}</td><td class="truncate">${escapeHtml(o.supplier||'')}</td><td>${escapeHtml(officerName(o.officerCode))}</td><td>${fmtDate(o.requestedReceiptDate)}</td></tr>`,
         ['Order','Supplier','Officer','Requested receipt'])}
 
       ${listCard('Follow-ups due — whole team', followUpsDue,
-        o => `<tr ${open(o.orderId)}><td class="mono">${esc(o.orderId)}</td><td class="truncate">${esc(o.supplier||'')}</td><td>${esc(officerName(o.officerCode))}</td><td>${fmtDate(o.nextSupplierFollowupDate)}</td></tr>`,
+        o => `<tr ${open(o.orderId)}><td class="mono">${escapeHtml(o.orderId)}</td><td class="truncate">${escapeHtml(o.supplier||'')}</td><td>${escapeHtml(officerName(o.officerCode))}</td><td>${fmtDate(o.nextSupplierFollowupDate)}</td></tr>`,
         ['Order','Supplier','Officer','Next follow-up'])}
     `;
   };
@@ -26374,12 +26378,9 @@ window.PhoenixERP = {
     return { head, body };
   }
 
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function fmtMoney(n, cur){ if (n==null||isNaN(n)) return '—'; return (cur?cur+' ':'') + Number(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
-  function fmtDate(d){ return (window.PXUtils&&window.PXUtils.fmtDate)?window.PXUtils.fmtDate(d):(d?new Date(d).toLocaleDateString():'—'); }
-
   // Build the "At a glance" FactBox from the current order context.
   function buildFactBox() {
+    const { escapeHtml, fmtDate, fmtMoney } = window.PXUtils;
     const ctx = window.__cardContext;
     if (!ctx || ctx.type !== 'order' || !ctx.record) return '';
     const o = ctx.record;
@@ -26394,7 +26395,7 @@ window.PhoenixERP = {
       otif = days > 0 ? `<span style="color:var(--danger)">${days}d overdue</span>` : `${Math.abs(days)}d to go`;
     } else if (received) { otif = '<span style="color:var(--success)">received</span>'; }
     const ships = ctx.linkedShipments || [];
-    const shipStatus = ships.length ? esc(ships[0].status || ships[0].shipmentStatus || 'in progress') : '—';
+    const shipStatus = ships.length ? escapeHtml(ships[0].status || ships[0].shipmentStatus || 'in progress') : '—';
 
     return `<aside class="factbox">
       <div class="factbox-head"><div class="t">At a glance</div></div>
@@ -26407,8 +26408,8 @@ window.PhoenixERP = {
       <div class="factbox-sec">
         <div class="lbl">Order</div>
         <div class="fb-row"><span class="k">Amount</span><span class="v">${fmtMoney(o.amount, o.currency)}</span></div>
-        <div class="fb-row"><span class="k">Supplier</span><span class="v" style="max-width:150px;text-align:right">${esc(o.supplier||'—')}</span></div>
-        <div class="fb-row"><span class="k">Officer</span><span class="v">${esc(o.officerCode||'—')}</span></div>
+        <div class="fb-row"><span class="k">Supplier</span><span class="v" style="max-width:150px;text-align:right">${escapeHtml(o.supplier||'—')}</span></div>
+        <div class="fb-row"><span class="k">Officer</span><span class="v">${escapeHtml(o.officerCode||'—')}</span></div>
         <div class="fb-row"><span class="k">Req. receipt</span><span class="v">${o.requestedReceiptDate?fmtDate(o.requestedReceiptDate):'—'}</span></div>
       </div>
     </aside>`;
