@@ -4008,7 +4008,7 @@ const REF = {
     stakeholder: {   // Internal Stakeholder (Claimant) — read-only + raise update requests
       orders:         ['view'],
       shipments:      ['view'],
-      exports:        ['view'],
+      exports:        [],
       payments:       ['view'],
       milestones:     [],
       suppliers:      [],
@@ -4042,7 +4042,7 @@ const REF = {
     demand_supervisor: { hidden: ['erpimportrules','erprecon','forecast','managementpack','mywork','officers','paymentexposure','payments','taxprovision','workingcalendars'], viewOnly: ['clearance','closedorders','containers','dailycontrol','documents','dqcockpit','exceptions','exceptionworkbench','kpitrends','mgmtcockpit','opcalendar','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','otifrisk','partials','scorecards','shipments','supplierchase','suppliers','workload'] },
     demand_officer: { hidden: ['teamwork','dailycontrol','dqcockpit','erpimportrules','erprecon','exceptionworkbench','forecast','kpitrends','managementpack','mgmtcockpit','mywork','officers','paymentexposure','payments','scorecards','supplierchase','taxprovision','workingcalendars','workload'], viewOnly: ['clearance','closedorders','containers','documents','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','otifrisk','partials','shipments','suppliers'] },
     finance: { hidden: ['teamwork','clearance','closedorders','containers','dailycontrol','dashboard','documents','dqcockpit','erpimportrules','erprecon','exceptions','exceptionworkbench','exports','kpitrends','managementpack','mgmtcockpit','mywork','officers','opcalendar','otifrisk','partials','reports','scorecards','shipments','supplierchase','suppliers','workingcalendars','workload'], viewOnly: ['orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','paymentexposure','payments'] },
-    stakeholder: { hidden: ['teamwork','clearance','closedorders','containers','dailycontrol','dashboard','dqcockpit','erpimportrules','erprecon','exceptions','exceptionworkbench','forecast','kpitrends','managementpack','mgmtcockpit','mywork','officers','opcalendar','otifrisk','partials','paymentexposure','payments','reports','scorecards','supplierchase','suppliers','taxprovision','workingcalendars','workload'], viewOnly: ['documents','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','shipments'] },
+    stakeholder: { hidden: ['teamwork','clearance','closedorders','containers','dailycontrol','dashboard','dqcockpit','erpimportrules','erprecon','exceptions','exceptionworkbench','exports','forecast','kpitrends','managementpack','mgmtcockpit','mywork','officers','opcalendar','otifrisk','partials','paymentexposure','payments','reports','scorecards','supplierchase','suppliers','taxprovision','workingcalendars','workload'], viewOnly: ['documents','orders-foreign-indirect','orders-foreign-supplychain','orders-foreign-technical','orders-local-indirect','orders-local-supplychain','orders-local-technical','shipments'] },
   },
 
   packagingUnits: [

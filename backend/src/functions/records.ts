@@ -14,7 +14,13 @@ import {
   updateOperationalRecord
 } from "../operational/records";
 import { queryParams, SqlQueryExecutor } from "../sql/client";
-import { assertOperationalWriteAllowed, PermissionDeniedError } from "../security/permissions";
+import {
+  assertOperationalReadAllowed,
+  assertOperationalWriteAllowed,
+  canReadCollection,
+  PermissionDeniedError,
+  redactOperationalRecordForRead
+} from "../security/permissions";
 import { BackendValidationError, validateOperationalWrite } from "../security/validate";
 
 async function jsonBody(request: HttpRequest): Promise<Record<string, unknown>> {
@@ -32,6 +38,26 @@ function listOptionsFrom(request: HttpRequest): { top?: string | null; skip?: st
     skip: request.query.get("skip"),
     changedSince: request.query.get("changedSince")
   };
+}
+
+function redactRows(
+  collectionName: string,
+  role: string,
+  rows: OperationalRecordData[]
+): OperationalRecordData[] {
+  return rows.map(row => redactOperationalRecordForRead(collectionName, role, row) as OperationalRecordData);
+}
+
+function filterReadableSnapshot(
+  snapshot: Record<string, OperationalRecordData[]>,
+  role: string
+): Record<string, OperationalRecordData[]> {
+  const out: Record<string, OperationalRecordData[]> = {};
+  for (const [collectionName, rows] of Object.entries(snapshot)) {
+    if (!canReadCollection(role, collectionName)) continue;
+    out[collectionName] = redactRows(collectionName, role, Array.isArray(rows) ? rows : []);
+  }
+  return out;
 }
 
 function errorResponse(error: unknown, context: InvocationContext): HttpResponseInit {
@@ -61,11 +87,13 @@ export async function operationalRecordsRoot(
   query: SqlQueryExecutor = queryParams
 ): Promise<HttpResponseInit> {
   try {
+    const role = await assertOperationalReadAllowed(undefined, actorFrom(request), query);
+    const snapshot = await listOperationalRecords(undefined, query) as Record<string, OperationalRecordData[]>;
     return {
       status: 200,
       jsonBody: {
         ok: true,
-        data: await listOperationalRecords(undefined, query),
+        data: filterReadableSnapshot(snapshot, role),
         generatedAt: new Date().toISOString()
       }
     };
@@ -83,12 +111,14 @@ export async function operationalRecordsCollection(
   try {
     assertOperationalCollection(collectionName);
     if (request.method === "GET") {
+      const role = await assertOperationalReadAllowed(collectionName, actorFrom(request), query);
+      const rows = await listOperationalRecords(collectionName, query, listOptionsFrom(request)) as OperationalRecordData[];
       return {
         status: 200,
         jsonBody: {
           ok: true,
           collection: collectionName,
-          data: await listOperationalRecords(collectionName, query, listOptionsFrom(request)),
+          data: redactRows(collectionName, role, rows),
           generatedAt: new Date().toISOString()
         }
       };
@@ -118,11 +148,13 @@ export async function operationalRecordsHeads(
   query: SqlQueryExecutor = queryParams
 ): Promise<HttpResponseInit> {
   try {
+    const role = await assertOperationalReadAllowed(undefined, actorFrom(request), query);
+    const heads = await listOperationalRecordHeads(query);
     return {
       status: 200,
       jsonBody: {
         ok: true,
-        data: await listOperationalRecordHeads(query),
+        data: heads.filter(head => canReadCollection(role, head.collectionName)),
         generatedAt: new Date().toISOString()
       }
     };

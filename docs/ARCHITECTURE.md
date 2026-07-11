@@ -174,7 +174,8 @@ Backend v1 scaffold:
 - `backend/src/functions/records.ts` exposes function-key protected operational
   record routes for internal browser API mode, including collection-level reads
   with `top`/`skip`/`changedSince` and `GET /api/records/heads` for lightweight
-  polling.
+  polling. Read routes require an active stored officer and return only collections
+  readable by that officer's stored role.
 - `backend/src/functions/counters.ts` exposes function-key protected atomic
   counters for generated references in internal browser API mode.
 - `backend/src/operational/records.ts` implements the operational record allowlist,
@@ -183,8 +184,9 @@ Backend v1 scaffold:
 - `backend/src/operational/counters.ts` validates counter keys and increments
   `dbo.app_counters` with parameterized SQL.
 - `backend/src/security/permissions.ts` mirrors the browser `REF.permissions`
-  matrix, resolves write roles from stored officer records, and fails closed for
-  unknown roles or collections.
+  matrix, resolves roles from stored officer records, filters API-mode reads by
+  collection/resource, redacts officer `email`/`authUid` for non-privileged reads,
+  and fails closed for unknown roles or collections.
 - `backend/src/security/validate.ts` enforces backend validation for high-risk
   API-mode writes, including required order fields, non-negative amounts, payment
   exposure versus linked order value, and unsafe document links.
@@ -303,6 +305,9 @@ Important limitations:
   Firebase is reselected, Firestore security rules must enforce the same access
   model server-side; role-aligned templates exist in `docs/FIRESTORE_RULES`.
 - API-mode local operator setup is not a final enterprise identity control. It is for closed-environment testing only; pilot/go-live still needs IT-approved SSO, Windows-integrated access, APIM policy, or another server-side identity boundary.
+- API-mode read routes now require the asserted local operator to resolve to an
+  active stored officer row. Until IT supplies final identity, local test data must
+  include officer records matching the operator codes testers use.
 
 ## API structure
 

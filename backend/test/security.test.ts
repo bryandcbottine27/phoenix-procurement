@@ -5,14 +5,16 @@ import { HttpRequest, InvocationContext } from "@azure/functions";
 import { test } from "node:test";
 import {
   can,
+  canReadCollection,
   canWriteCollection,
   PERMISSIONS,
   PermissionDeniedError,
+  redactOperationalRecordForRead,
   resolveOfficerRole
 } from "../src/security/permissions";
 import { BackendValidationError, isSafeLink, validateOperationalWrite } from "../src/security/validate";
-import { operationalRecordsCollection } from "../src/functions/records";
-import { SqlQueryExecutor } from "../src/sql/client";
+import { operationalRecordsCollection, operationalRecordsHeads, operationalRecordsRoot } from "../src/functions/records";
+import { SqlParams, SqlQueryExecutor } from "../src/sql/client";
 
 function extractObjectLiteralAfter(source: string, label: string): string {
   const idx = source.indexOf(label);
@@ -74,14 +76,12 @@ function parseBrowserPermissions(): unknown {
   return Function(`return (${literal});`)();
 }
 
-function fakeRoleQuery(role: string | null): SqlQueryExecutor & { calls: string[] } {
+function fakeRoleQuery(role: string | null, active = true): SqlQueryExecutor & { calls: string[] } {
   const calls: string[] = [];
   const query = (async (sqlText: string) => {
     calls.push(sqlText);
     if (sqlText.includes("@officers_collection")) {
-      return {
-        recordset: role ? [{ dataJson: JSON.stringify({ code: "USER", role, active: true }) }] : []
-      } as never;
+      return { recordset: role ? [{ dataJson: JSON.stringify({ code: "USER", role, active }) }] : [] } as never;
     }
     if (sqlText.includes("FROM dbo.operational_records")) {
       return { recordset: [] } as never;
@@ -94,15 +94,74 @@ function fakeRoleQuery(role: string | null): SqlQueryExecutor & { calls: string[
 
 function requestFor(
   collection: string,
-  body: Record<string, unknown>,
-  actor = "USER"
+  body: Record<string, unknown> = {},
+  actor = "USER",
+  method = "POST"
 ): HttpRequest {
   return {
-    method: "POST",
+    method,
     params: { collection },
     headers: { get: (name: string) => name.toLowerCase() === "x-phoenix-user" ? actor : null },
+    query: new URLSearchParams(),
     json: async () => body
   } as unknown as HttpRequest;
+}
+
+function rootRequest(actor = "USER"): HttpRequest {
+  return {
+    method: "GET",
+    params: {},
+    headers: { get: (name: string) => name.toLowerCase() === "x-phoenix-user" ? actor : null },
+    query: new URLSearchParams(),
+    json: async () => ({})
+  } as unknown as HttpRequest;
+}
+
+function operationalRow(collectionName: string, recordId: string, data: Record<string, unknown>) {
+  return {
+    collectionName,
+    recordId,
+    entity: typeof data.entity === "string" ? data.entity : null,
+    dataJson: JSON.stringify(data),
+    archived: false,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    updatedAt: "2026-07-01T00:00:00.000Z"
+  };
+}
+
+function fakeReadQuery(role: string | null): SqlQueryExecutor {
+  const rows = [
+    operationalRow("orders", "ORDER-1", { orderId: "PO-1", supplier: "Supplier A" }),
+    operationalRow("payment_requests", "PAY-1", { orderId: "PO-1", amount: 25 }),
+    operationalRow("officers", "OFF-1", { code: "OFF1", fullName: "Officer One", email: "officer@example.com", authUid: "uid-1", role: "admin" }),
+    operationalRow("system_config", "CFG-1", { configKey: "business_calendars" }),
+    operationalRow("status_log", "LOG-1", { entryText: "Sensitive audit row" })
+  ];
+  return (async (sqlText: string, params: SqlParams = {}) => {
+    if (sqlText.includes("@officers_collection")) {
+      return { recordset: role ? [{ dataJson: JSON.stringify({ code: "USER", role, active: true }) }] : [] } as never;
+    }
+    if (sqlText.includes("GROUP BY collection_name")) {
+      return {
+        recordset: rows.map(row => ({
+          collectionName: row.collectionName,
+          maxUpdatedAt: row.updatedAt,
+          count: 1
+        }))
+      } as never;
+    }
+    if (sqlText.includes("FROM dbo.orders")) {
+      return { recordset: [{ maxUpdatedAt: "2026-07-02T00:00:00.000Z", count: 2 }] } as never;
+    }
+    if (sqlText.includes("WITH ranked")) {
+      return { recordset: rows } as never;
+    }
+    if (sqlText.includes("collection_name = @collection_name")) {
+      const collectionName = (params.collection_name as { value?: string } | undefined)?.value;
+      return { recordset: rows.filter(row => row.collectionName === collectionName) } as never;
+    }
+    throw new Error(`Unexpected SQL in fake read query: ${sqlText}`);
+  }) as SqlQueryExecutor;
 }
 
 const context = {
@@ -116,6 +175,7 @@ test("backend permission matrix stays in lockstep with browser REF.permissions",
 
 test("server-side permission helper fails closed and keeps privileged collections privileged", async () => {
   assert.equal(can("admin", "payments", "create"), true);
+  assert.equal(can("stakeholder", "exports", "view"), false);
   assert.equal(can("stakeholder", "payments", "create"), false);
   assert.equal(can("missing_role", "orders", "create"), false);
   assert.equal(canWriteCollection("stakeholder", "payment_requests", "create"), false);
@@ -128,6 +188,31 @@ test("server-side permission helper fails closed and keeps privileged collection
     }),
     PermissionDeniedError
   );
+});
+
+test("server-side read helper filters by role and redacts officer PII", () => {
+  assert.equal(canReadCollection("demand_officer", "payment_requests"), false);
+  assert.equal(canReadCollection("stakeholder", "exports"), false);
+  assert.equal(canReadCollection("stakeholder", "orders"), true);
+  assert.equal(canReadCollection("stakeholder", "officers"), true);
+  assert.equal(canReadCollection("stakeholder", "system_config"), true);
+  assert.equal(canReadCollection("stakeholder", "status_log"), false);
+  assert.equal(canReadCollection("procurement_technical_manager", "status_log"), true);
+  assert.equal(canReadCollection("finance", "shipments"), false);
+  assert.equal(canReadCollection("finance", "payment_requests"), true);
+  assert.equal(canReadCollection("missing_role", "orders"), false);
+
+  const officer = {
+    code: "OFF1",
+    fullName: "Officer One",
+    email: "officer@example.com",
+    authUid: "uid-1"
+  };
+  assert.deepEqual(redactOperationalRecordForRead("officers", "stakeholder", officer), {
+    code: "OFF1",
+    fullName: "Officer One"
+  });
+  assert.equal(redactOperationalRecordForRead("officers", "admin", officer).email, "officer@example.com");
 });
 
 test("backend validators block missing supplier, unsafe links, and overpayments", async () => {
@@ -159,6 +244,39 @@ test("records endpoint denies stakeholder payment create and ignores client-sent
     data: { orderId: "PO-1", amount: 1, role: "admin" }
   }), context, fakeRoleQuery("stakeholder"));
   assert.equal(response.status, 403);
+});
+
+test("records read endpoints require a stored active officer and filter readable collections", async () => {
+  const root = await operationalRecordsRoot(rootRequest(), context, fakeReadQuery("demand_officer"));
+  assert.equal(root.status, 200);
+  const rootData = (root.jsonBody as { data: Record<string, Record<string, unknown>[]> }).data;
+  assert.ok(rootData.orders);
+  assert.ok(rootData.officers);
+  assert.ok(rootData.system_config);
+  assert.equal(rootData.payment_requests, undefined);
+  assert.equal(rootData.status_log, undefined);
+  assert.equal(rootData.officers[0].email, undefined);
+  assert.equal(rootData.officers[0].authUid, undefined);
+
+  const heads = await operationalRecordsHeads(rootRequest(), context, fakeReadQuery("demand_officer"));
+  assert.equal(heads.status, 200);
+  const headCollections = ((heads.jsonBody as { data: { collectionName: string }[] }).data).map(row => row.collectionName);
+  assert.ok(headCollections.includes("orders"));
+  assert.ok(headCollections.includes("officers"));
+  assert.equal(headCollections.includes("payment_requests"), false);
+  assert.equal(headCollections.includes("status_log"), false);
+
+  const forbidden = await operationalRecordsCollection(requestFor("payment_requests", {}, "USER", "GET"), context, fakeReadQuery("demand_officer"));
+  assert.equal(forbidden.status, 403);
+
+  const missingOfficer = await operationalRecordsCollection(requestFor("orders", {}, "USER", "GET"), context, fakeReadQuery(null));
+  assert.equal(missingOfficer.status, 403);
+
+  const adminOfficers = await operationalRecordsCollection(requestFor("officers", {}, "USER", "GET"), context, fakeReadQuery("admin"));
+  assert.equal(adminOfficers.status, 200);
+  const adminRows = (adminOfficers.jsonBody as { data: Record<string, unknown>[] }).data;
+  assert.equal(adminRows[0].email, "officer@example.com");
+  assert.equal(adminRows[0].authUid, "uid-1");
 });
 
 test("records endpoint returns 400 for unknown collections and invalid payloads", async () => {

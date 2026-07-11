@@ -23,7 +23,7 @@ export const PERMISSIONS: PermissionMatrix = {
   demand_supervisor: { orders: ["view"], shipments: ["view"], exports: ["view"], payments: [], milestones: ["view"], suppliers: ["view"], documents: ["view"], followups: ["view"], issues: ["view"], updateRequests: ["view", "create", "edit"], officers: [], reports: ["view"], erprecon: [], logisticsCost: [] },
   demand_officer: { orders: ["view"], shipments: ["view"], exports: ["view"], payments: [], milestones: ["view"], suppliers: ["view"], documents: ["view"], followups: ["view"], issues: ["view"], updateRequests: ["view", "create", "edit"], officers: [], reports: ["view"], erprecon: [], logisticsCost: [] },
   finance: { orders: ["view"], shipments: [], exports: [], payments: ["view", "approve"], milestones: ["view"], suppliers: ["view"], documents: ["view"], followups: [], issues: ["view"], updateRequests: ["view", "create", "edit"], officers: [], reports: ["view"], erprecon: [], logisticsCost: [] },
-  stakeholder: { orders: ["view"], shipments: ["view"], exports: ["view"], payments: ["view"], milestones: [], suppliers: [], documents: ["view"], followups: [], issues: ["view"], updateRequests: ["view", "create", "edit"], officers: [], reports: [], erprecon: [], logisticsCost: [] }
+  stakeholder: { orders: ["view"], shipments: ["view"], exports: [], payments: ["view"], milestones: [], suppliers: [], documents: ["view"], followups: [], issues: ["view"], updateRequests: ["view", "create", "edit"], officers: [], reports: [], erprecon: [], logisticsCost: [] }
 };
 
 export const RESOURCE_FOR_COLLECTION: Record<string, string | undefined> = {
@@ -40,6 +40,8 @@ export const RESOURCE_FOR_COLLECTION: Record<string, string | undefined> = {
 };
 
 const PRIVILEGED_COLLECTIONS = new Set(["status_log", "system_config", "kpiSnapshot"]);
+const READ_REFERENCE_COLLECTIONS = new Set(["system_config", "officers", "suppliers"]);
+const READ_PRIVILEGED_COLLECTIONS = new Set(["status_log", "kpiSnapshot"]);
 
 interface OfficerRow {
   dataJson: string;
@@ -51,6 +53,11 @@ function normaliseRole(role: unknown): string {
     accounts: "finance"
   };
   return aliases[raw] || raw;
+}
+
+export function isKnownRole(roleInput: unknown): boolean {
+  const role = normaliseRole(roleInput);
+  return role === "admin" || Object.prototype.hasOwnProperty.call(PERMISSIONS, role);
 }
 
 export function permissionActionFor(action: string): string {
@@ -90,6 +97,29 @@ export function canWriteCollection(
   const resource = resourceForCollection(collectionName, data);
   if (!resource) return false;
   return can(role, resource, permissionActionFor(action));
+}
+
+export function canReadCollection(role: unknown, collectionName: string): boolean {
+  if (!isKnownRole(role)) return false;
+  if (READ_REFERENCE_COLLECTIONS.has(collectionName)) return true;
+  if (READ_PRIVILEGED_COLLECTIONS.has(collectionName)) return isPrivilegedRole(role);
+  if (collectionName === "contactLog") {
+    return can(role, "orders", "view") || can(role, "shipments", "view");
+  }
+  const resource = resourceForCollection(collectionName);
+  return !!resource && can(role, resource, "view");
+}
+
+export function redactOperationalRecordForRead(
+  collectionName: string,
+  role: unknown,
+  data: Record<string, unknown>
+): Record<string, unknown> {
+  if (collectionName !== "officers" || isPrivilegedRole(role)) return data;
+  const redacted = { ...data };
+  delete redacted.email;
+  delete redacted.authUid;
+  return redacted;
 }
 
 export async function resolveOfficerRole(
@@ -132,4 +162,19 @@ export async function assertOperationalWriteAllowed(
   const role = await resolveOfficerRole(actor, query);
   if (role && canWriteCollection(role, collectionName, action, data)) return role;
   throw new PermissionDeniedError(`Not authorised to ${permissionActionFor(action)} ${collectionName}.`);
+}
+
+export async function assertOperationalReadAllowed(
+  collectionName: string | undefined,
+  actor: string,
+  query: SqlQueryExecutor = queryParams
+): Promise<string> {
+  const role = await resolveOfficerRole(actor, query);
+  if (!role || !isKnownRole(role)) {
+    throw new PermissionDeniedError("Not authorised to read operational records.");
+  }
+  if (collectionName && !canReadCollection(role, collectionName)) {
+    throw new PermissionDeniedError(`Not authorised to view ${collectionName}.`);
+  }
+  return role;
 }

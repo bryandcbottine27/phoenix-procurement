@@ -174,6 +174,7 @@ expectCannot('finance', 'payments', 'create');
 expectCannot('finance', 'payments', 'edit');
 
 expectCan('stakeholder', 'updateRequests', 'create');
+expectCannot('stakeholder', 'exports', 'view');
 expectCannot('stakeholder', 'payments', 'create');
 expectCannot('stakeholder', 'payments', 'approve');
 expectCannot('stakeholder', 'followups', 'create');
@@ -181,6 +182,7 @@ expectCannot('stakeholder', 'followups', 'create');
 check('unknown role fails closed in production permissions', !roleCan('made_up_role', 'orders', 'view', false));
 check('unknown role is permissive only in demo permissions', roleCan('made_up_role', 'orders', 'view', true));
 check('stakeholder cannot navigate to payments', viewLevel('stakeholder', 'payments') === 'none');
+check('stakeholder cannot navigate to exports', viewLevel('stakeholder', 'exports') === 'none');
 check('finance sees payments as view-only', viewLevel('finance', 'payments') === 'view');
 check('unknown production role has no navigation', viewLevel('made_up_role', 'dashboard') === 'none');
 

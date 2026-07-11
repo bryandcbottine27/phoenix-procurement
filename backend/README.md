@@ -165,10 +165,19 @@ support `top`, `skip`, and `changedSince`; `status_log` is capped to the latest
 200 rows by default so routine API polling cannot drag the full audit history into
 the browser.
 
-`PXApiClient` sends the current operator code in `x-phoenix-user` so backend audit
-metadata such as `archivedBy` is not stamped as a generic API user during internal
-testing. This is attribution only; final identity and authorization enforcement
-must still come from the IT-approved server-side gateway/backend policy.
+Read routes require `x-phoenix-user` to resolve to an active stored officer in
+`dbo.operational_records`. `GET /api/records` and `GET /api/records/heads` return
+only collections readable by that stored role. Reference data (`system_config`,
+`officers`, `suppliers`) is available to any active known role, but non-privileged
+roles receive officer names/codes without `email` or `authUid`. `status_log` and
+`kpiSnapshot` are privileged. `GET /api/records/{collection}` returns `403` when
+the stored role cannot read that collection.
+
+`PXApiClient` sends the current operator code in `x-phoenix-user` so backend read
+authorization and audit metadata such as `archivedBy` use the local operator
+during internal testing. This header is not a final identity proof; pilot/go-live
+still needs the IT-approved gateway/backend policy that makes the asserted user
+trustworthy.
 
 `POST /api/counters/{counterKey}/next` returns an atomic SQL-backed integer from
 `dbo.app_counters`. The first browser use is API-mode RFP numbering, replacing the

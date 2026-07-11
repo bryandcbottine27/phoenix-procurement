@@ -1903,8 +1903,8 @@ overdue returns, open one-way, and **average turnaround by reason** (calibration
 repair, etc.). Sidebar count badges the overdue-return count.
 
 **Access:** `exports` permission — logistics_manager / logistics_officer create/edit/
-archive; procurement (all levels), demand planning, and stakeholder view-only; finance
-none. Form-openers self-guard (defense in depth).
+archive; procurement (all levels) and demand planning view-only; stakeholder and
+finance none. Form-openers self-guard (defense in depth).
 
 **Not in OTIF:** exports never enter the inbound OTIF/KPI engine. They are outbound and
 measured only by their own turnaround / overdue metrics.

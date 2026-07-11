@@ -1,6 +1,6 @@
 # Phoenix Procurement - Business Rules
 
-Last reviewed: 2026-07-10
+Last reviewed: 2026-07-11
 
 This document distinguishes confirmed rules from assumptions and unresolved questions. Before changing procurement, logistics, finance, import, or access behaviour, check this file and `docs/DECISIONS.md`.
 
@@ -307,6 +307,9 @@ Confirmed principles:
 - Server-side authorization must enforce the same access model before production.
   In API mode this belongs at the internal gateway/backend layer; if Firebase is
   reselected, Firestore rules must enforce the same model.
+- Internal stakeholders can view relevant orders, shipments, documents, issues,
+  and update requests, but they do not receive the exports/outbound or reports
+  datasets.
 
 Request Update visibility:
 
