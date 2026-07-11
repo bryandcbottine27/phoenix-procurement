@@ -132,7 +132,7 @@ Before pilot/go-live, IT must choose and enforce one server-side identity path:
 - APIM or reverse-proxy policy that injects verified user identity;
 - Firebase password/SSO only if IT deliberately reselects Firebase.
 
-Server-side authorization must enforce the same role model as the browser (`REF.permissions`, `REF.viewAccess`, `PXPermissions`). Browser checks are not sufficient for production.
+The backend operational-record API re-enforces the browser write permission matrix against the stored officer role and rejects invalid high-risk payloads. Browser checks are still not sufficient for production: IT must ensure the gateway/backend identity policy makes the submitted user identity trustworthy and impossible to spoof.
 
 ## 7. Data Preparation
 

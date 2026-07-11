@@ -2,14 +2,19 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/fu
 import {
   archiveOperationalRecord,
   createOperationalRecord,
+  getOperationalRecord,
   listOperationalRecords,
   OperationalBadRequestError,
   OperationalNotFoundError,
   OperationalRecordData,
   OperationalStaleWriteError,
+  assertOperationalCollection,
   restoreOperationalRecord,
   updateOperationalRecord
 } from "../operational/records";
+import { queryParams, SqlQueryExecutor } from "../sql/client";
+import { assertOperationalWriteAllowed, PermissionDeniedError } from "../security/permissions";
+import { BackendValidationError, validateOperationalWrite } from "../security/validate";
 
 async function jsonBody(request: HttpRequest): Promise<Record<string, unknown>> {
   const body = await request.json().catch(() => ({}));
@@ -25,6 +30,12 @@ function errorResponse(error: unknown, context: InvocationContext): HttpResponse
   if (error instanceof OperationalBadRequestError) {
     return { status: 400, jsonBody: { ok: false, error: message } };
   }
+  if (error instanceof BackendValidationError) {
+    return { status: 400, jsonBody: { ok: false, error: message, errors: error.errors } };
+  }
+  if (error instanceof PermissionDeniedError) {
+    return { status: 403, jsonBody: { ok: false, error: message } };
+  }
   if (error instanceof OperationalNotFoundError) {
     return { status: 404, jsonBody: { ok: false, error: message } };
   }
@@ -35,13 +46,17 @@ function errorResponse(error: unknown, context: InvocationContext): HttpResponse
   return { status: 500, jsonBody: { ok: false, error: message } };
 }
 
-export async function operationalRecordsRoot(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export async function operationalRecordsRoot(
+  request: HttpRequest,
+  context: InvocationContext,
+  query: SqlQueryExecutor = queryParams
+): Promise<HttpResponseInit> {
   try {
     return {
       status: 200,
       jsonBody: {
         ok: true,
-        data: await listOperationalRecords(),
+        data: await listOperationalRecords(undefined, query),
         generatedAt: new Date().toISOString()
       }
     };
@@ -50,23 +65,31 @@ export async function operationalRecordsRoot(request: HttpRequest, context: Invo
   }
 }
 
-export async function operationalRecordsCollection(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export async function operationalRecordsCollection(
+  request: HttpRequest,
+  context: InvocationContext,
+  query: SqlQueryExecutor = queryParams
+): Promise<HttpResponseInit> {
   const collectionName = request.params.collection || "";
   try {
+    assertOperationalCollection(collectionName);
     if (request.method === "GET") {
       return {
         status: 200,
         jsonBody: {
           ok: true,
           collection: collectionName,
-          data: await listOperationalRecords(collectionName),
+          data: await listOperationalRecords(collectionName, query),
           generatedAt: new Date().toISOString()
         }
       };
     }
     const body = await jsonBody(request);
     const data = (body.data && typeof body.data === "object" ? body.data : body) as OperationalRecordData;
-    const created = await createOperationalRecord(collectionName, data, actorFrom(request));
+    const actor = actorFrom(request);
+    await assertOperationalWriteAllowed(collectionName, "create", actor, data, query);
+    await validateOperationalWrite(collectionName, data, null, query);
+    const created = await createOperationalRecord(collectionName, data, actor, query);
     return {
       status: 201,
       jsonBody: {
@@ -80,18 +103,29 @@ export async function operationalRecordsCollection(request: HttpRequest, context
   }
 }
 
-export async function operationalRecordsItem(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export async function operationalRecordsItem(
+  request: HttpRequest,
+  context: InvocationContext,
+  query: SqlQueryExecutor = queryParams
+): Promise<HttpResponseInit> {
   const collectionName = request.params.collection || "";
   const id = request.params.id || "";
   try {
+    assertOperationalCollection(collectionName);
     const body = await jsonBody(request);
     const data = (body.data && typeof body.data === "object" ? body.data : body) as OperationalRecordData;
+    const actor = actorFrom(request);
+    await assertOperationalWriteAllowed(collectionName, "update", actor, data, query);
+    const existing = await getOperationalRecord(collectionName, id, query);
+    if (!existing) throw new OperationalNotFoundError(`Record not found: ${collectionName}/${id}`);
+    await validateOperationalWrite(collectionName, { ...existing, ...data, id }, existing, query);
     const updated = await updateOperationalRecord(
       collectionName,
       id,
       data,
-      actorFrom(request),
-      body.expectedUpdatedAt
+      actor,
+      body.expectedUpdatedAt,
+      query
     );
     return {
       status: 200,
@@ -106,16 +140,24 @@ export async function operationalRecordsItem(request: HttpRequest, context: Invo
   }
 }
 
-export async function operationalRecordsArchive(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export async function operationalRecordsArchive(
+  request: HttpRequest,
+  context: InvocationContext,
+  query: SqlQueryExecutor = queryParams
+): Promise<HttpResponseInit> {
   const collectionName = request.params.collection || "";
   const id = request.params.id || "";
   try {
+    assertOperationalCollection(collectionName);
     const body = await jsonBody(request);
+    const actor = actorFrom(request);
+    await assertOperationalWriteAllowed(collectionName, "archive", actor, undefined, query);
     const archived = await archiveOperationalRecord(
       collectionName,
       id,
       typeof body.reason === "string" ? body.reason : undefined,
-      actorFrom(request)
+      actor,
+      query
     );
     return {
       status: 200,
@@ -130,11 +172,18 @@ export async function operationalRecordsArchive(request: HttpRequest, context: I
   }
 }
 
-export async function operationalRecordsRestore(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export async function operationalRecordsRestore(
+  request: HttpRequest,
+  context: InvocationContext,
+  query: SqlQueryExecutor = queryParams
+): Promise<HttpResponseInit> {
   const collectionName = request.params.collection || "";
   const id = request.params.id || "";
   try {
-    const restored = await restoreOperationalRecord(collectionName, id, actorFrom(request));
+    assertOperationalCollection(collectionName);
+    const actor = actorFrom(request);
+    await assertOperationalWriteAllowed(collectionName, "restore", actor, undefined, query);
+    const restored = await restoreOperationalRecord(collectionName, id, actor, query);
     return {
       status: 200,
       jsonBody: {

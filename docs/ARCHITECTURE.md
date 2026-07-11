@@ -177,6 +177,12 @@ Backend v1 scaffold:
   JSON record mapping, soft archive/restore, and stale-write guard over SQL Server.
 - `backend/src/operational/counters.ts` validates counter keys and increments
   `dbo.app_counters` with parameterized SQL.
+- `backend/src/security/permissions.ts` mirrors the browser `REF.permissions`
+  matrix, resolves write roles from stored officer records, and fails closed for
+  unknown roles or collections.
+- `backend/src/security/validate.ts` enforces backend validation for high-risk
+  API-mode writes, including required order fields, non-negative amounts, payment
+  exposure versus linked order value, and unsafe document links.
 - `backend/src/analytics/cycleTime.ts` computes order-only cycle and bottleneck metrics from SQL orders, grouped by officer, supplier, category, and function.
 - `backend/src/analytics/otifRisk.ts` scores open orders that are not yet requested-receipt overdue using order-only signals such as near-due requested receipt, stale sync, long-open age, and missing classification.
 - `backend/src/worklists/unclassified.ts` lists `sync_exceptions` rows for unclassified, unmapped-supplier, and currency-ambiguous worklists and emits suggested actions for the future admin UI.
@@ -284,7 +290,13 @@ Authorization layers:
 
 Important limitations:
 
-- Client-side authorization is not enough for production. In API mode, the internal gateway/backend must enforce identity and authorization server-side. If Firebase is reselected, Firestore security rules must enforce the same access model server-side; role-aligned templates exist in `docs/FIRESTORE_RULES`.
+- Client-side authorization is not enough for production. API mode now enforces
+  the browser permission matrix again on operational write routes by resolving
+  `x-phoenix-user` to the stored officer role, ignoring any client-sent role, and
+  returning `403` when denied. Pilot/go-live still needs the IT-approved identity
+  and gateway/backend policy so that `x-phoenix-user` itself is trusted. If
+  Firebase is reselected, Firestore security rules must enforce the same access
+  model server-side; role-aligned templates exist in `docs/FIRESTORE_RULES`.
 - API-mode local operator setup is not a final enterprise identity control. It is for closed-environment testing only; pilot/go-live still needs IT-approved SSO, Windows-integrated access, APIM policy, or another server-side identity boundary.
 
 ## API structure

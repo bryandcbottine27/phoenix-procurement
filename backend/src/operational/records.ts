@@ -108,6 +108,16 @@ async function findRow(
   return result.recordset[0] || null;
 }
 
+export async function getOperationalRecord(
+  collectionName: string,
+  id: string,
+  query: SqlQueryExecutor = queryParams
+): Promise<OperationalRecordData | null> {
+  const collection = assertOperationalCollection(collectionName);
+  const row = await findRow(collection, id, query);
+  return row ? parseData(row) : null;
+}
+
 export async function listOperationalRecords(
   collectionName?: string,
   query: SqlQueryExecutor = queryParams

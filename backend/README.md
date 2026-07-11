@@ -172,6 +172,16 @@ without Firebase. It is not a final normalized data warehouse model; IT/business
 can still approve a later normalized operational schema once hosting, identity,
 and reporting requirements are final.
 
+Operational record write routes enforce the browser permission matrix again on
+the server. The API resolves the submitted `x-phoenix-user` value to the stored
+`officers` record in `dbo.operational_records` and uses that stored role; it does
+not accept a client-supplied role from the request body. Unknown/missing roles
+fail closed with `403`. The routes also run backend validation for high-risk
+payloads such as required order fields, non-negative order/payment amounts,
+payment totals versus linked order value, and unsafe document links. This is a
+closed-environment guardrail; pilot/go-live still needs the IT-approved identity
+and gateway/backend authorization policy in front of the Function app.
+
 ## Read API Contract
 
 Read endpoints use `authLevel: "function"` and should be served through the
