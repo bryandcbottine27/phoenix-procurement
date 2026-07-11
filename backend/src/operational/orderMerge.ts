@@ -226,7 +226,7 @@ export async function readErpOrders(query: SqlQueryExecutor = queryParams): Prom
   }));
 }
 
-export async function readOperationalOrders(query: SqlQueryExecutor = queryParams): Promise<OrderRecord[]> {
+export async function readRawOperationalOrders(query: SqlQueryExecutor = queryParams): Promise<OrderRecord[]> {
   const result = await query<OperationalOrderRow>(`
     SELECT
       record_id AS recordId,
@@ -236,6 +236,7 @@ export async function readOperationalOrders(query: SqlQueryExecutor = queryParam
       updated_at AS updatedAt
     FROM dbo.operational_records
     WHERE collection_name = @orders_collection
+      AND archived = 0
     ORDER BY updated_at DESC, record_id;
   `, {
     orders_collection: typedParam(sql.NVarChar(80), "orders")
@@ -243,29 +244,24 @@ export async function readOperationalOrders(query: SqlQueryExecutor = queryParam
   return result.recordset.map(parseOperationalRow);
 }
 
+export function readOperationalOrders(query: SqlQueryExecutor = queryParams): Promise<OrderRecord[]> {
+  return readRawOperationalOrders(query);
+}
+
 export async function listMergedOrders(
   query: SqlQueryExecutor = queryParams,
-  options: MergedOrderListOptions = {}
+  _options: MergedOrderListOptions = {}
 ): Promise<OrderRecord[]> {
   const erpOrders = await readErpOrders(query);
-  const operationalOrders = await readOperationalOrders(query);
-  let rows = mergeOrders(erpOrders, operationalOrders);
-  if (options.changedSince) {
-    const minTime = options.changedSince.getTime();
-    rows = rows.filter(row => {
-      const updatedAt = row.updatedAt ? new Date(String(row.updatedAt)).getTime() : 0;
-      return Number.isFinite(updatedAt) && updatedAt > minTime;
-    });
-  }
+  const operationalOrders = await readRawOperationalOrders(query);
+  const rows = mergeOrders(erpOrders, operationalOrders);
   rows.sort((a, b) => {
     const updatedA = a.updatedAt ? new Date(String(a.updatedAt)).getTime() : 0;
     const updatedB = b.updatedAt ? new Date(String(b.updatedAt)).getTime() : 0;
     if (updatedA !== updatedB) return updatedB - updatedA;
     return String(a.orderId || "").localeCompare(String(b.orderId || ""));
   });
-  const skip = options.skip || 0;
-  const top = options.top === undefined ? rows.length : options.top;
-  return rows.slice(skip, skip + top);
+  return rows;
 }
 
 export function mergeOrders(erpOrders: OrderRecord[], operationalOrders: OrderRecord[]): OrderRecord[] {

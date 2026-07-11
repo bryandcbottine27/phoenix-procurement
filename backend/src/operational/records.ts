@@ -6,6 +6,7 @@ import {
   mergeOrders,
   parseSyntheticOrderId,
   readErpOrders,
+  readRawOperationalOrders,
   stripErpOwnedFieldsForOverlay
 } from "./orderMerge";
 
@@ -172,15 +173,11 @@ export async function listOperationalRecords(
   const params: Record<string, unknown> = {};
   if (collectionName) {
     const collection = assertOperationalCollection(collectionName);
+    if (collection === "orders") {
+      return listMergedOrders(query) as Promise<OperationalRecordData[]>;
+    }
     const skip = parseNonNegativeInt(options.skip, "skip", 0) || 0;
     const top = parseTop(options.top, collection === "status_log" ? STATUS_LOG_CAP : undefined);
-    if (collection === "orders") {
-      return listMergedOrders(query, {
-        skip,
-        top,
-        changedSince: changedSinceDate(options.changedSince)
-      }) as Promise<OperationalRecordData[]>;
-    }
     const clauses = ["collection_name = @collection_name"];
     params.collection_name = collectionParam(collection);
     const changedSince = changedSinceParam(options.changedSince);
@@ -248,7 +245,7 @@ export async function listOperationalRecords(
     const bucket = grouped[row.collectionName] || (grouped[row.collectionName] = []);
     bucket.push(parseData(row));
   }
-  grouped.orders = mergeOrders(await readErpOrders(query), grouped.orders);
+  grouped.orders = mergeOrders(await readErpOrders(query), await readRawOperationalOrders(query));
   return grouped;
 }
 

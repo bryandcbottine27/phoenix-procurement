@@ -51,7 +51,7 @@ test("operational record list caps status_log and supports changedSince paging",
   assert.ok(seenParams.changed_since);
 });
 
-test("operational order reads merge ERP orders with Phoenix overlays", async () => {
+test("operational order reads merge full ERP and active Phoenix overlays without paging deltas", async () => {
   let call = 0;
   const query = (async (sqlText: string, params: SqlParams = {}) => {
     call += 1;
@@ -111,6 +111,10 @@ test("operational order reads merge ERP orders with Phoenix overlays", async () 
       } as never;
     }
     assert.equal((params.orders_collection as { value?: string }).value, "orders");
+    assert.match(sqlText, /archived = 0/i);
+    assert.equal(params.top, undefined);
+    assert.equal(params.skip, undefined);
+    assert.equal(params.changed_since, undefined);
     return {
       recordset: [{
         recordId: "overlay-1",
@@ -129,7 +133,11 @@ test("operational order reads merge ERP orders with Phoenix overlays", async () 
     } as never;
   }) as SqlQueryExecutor;
 
-  const rows = await listOperationalRecords("orders", query) as Record<string, unknown>[];
+  const rows = await listOperationalRecords("orders", query, {
+    top: "not-a-number",
+    skip: "not-a-number",
+    changedSince: "not-a-date"
+  }) as Record<string, unknown>[];
   assert.equal(call, 2);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].id, "overlay-1");
