@@ -181,12 +181,12 @@ Backend v1 scaffold:
 - `backend/src/operational/records.ts` implements the operational record allowlist,
   JSON record mapping, capped `status_log` reads, per-collection change heads,
   soft archive/restore, and stale-write guard over SQL Server.
-- `backend/src/operational/orderMerge.ts` is the R1 design-spike for merging SQL
-  ERP orders with Phoenix operational overlays. It derives ERP-owned fields from
-  the connector field list, keeps Phoenix-owned overlay fields, can strip
-  ERP-owned values before future overlay writes, and can report ERP-only,
-  app-only, and value-mismatch reconciliation issues. This helper is tested but
-  is not yet wired into the live `/api/records` order read/write path.
+- `backend/src/operational/orderMerge.ts` merges SQL ERP orders with Phoenix
+  operational overlays for API-mode `/api/records` order reads. It derives
+  ERP-owned fields from the connector field list, keeps Phoenix-owned overlay
+  fields, strips ERP-owned values before order overlay writes, supports
+  synthetic ERP-only order ids when the browser first edits an ERP-sourced order,
+  and reports ERP-only, app-only, and value-mismatch reconciliation issues.
 - `backend/src/operational/counters.ts` validates counter keys and increments
   `dbo.app_counters` with parameterized SQL.
 - `backend/src/security/permissions.ts` mirrors the browser `REF.permissions`
@@ -327,6 +327,9 @@ Current backend HTTP API scaffold:
 - `GET /api/worklists/unclassified` in `backend/src/functions/unclassifiedWorklist.ts`, function-auth, returns actionable sync exception worklist rows for future admin remediation screens.
 - `GET /api/notifications/order-alerts/preview` in `backend/src/functions/orderAlertNotifications.ts`, function-auth, returns a dry-run summary of order alert digests without Graph delivery or sent-state writes.
 - `GET /api/records`, `GET /api/records/heads`, `GET/POST /api/records/{collection}`, `PATCH /api/records/{collection}/{id}`, `POST /api/records/{collection}/{id}/archive`, and `POST /api/records/{collection}/{id}/restore` in `backend/src/functions/records.ts`, function-auth, provide the internal browser operational store.
+- `GET /api/reconciliation/orders` in `backend/src/functions/orderReconciliation.ts`,
+  function-auth, returns ERP-only, app-only, and ERP/Phoenix value-mismatch
+  order issues for admin/manager reconciliation.
 - `POST /api/counters/{counterKey}/next` in `backend/src/functions/counters.ts`,
   function-auth, provides atomic generated-reference counters for API mode.
 - `POST /api/sync/purchase-orders` in `backend/src/functions/syncPurchaseOrders.ts`, function-auth, runs the fixture-backed purchase-order sync.

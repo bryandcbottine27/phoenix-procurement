@@ -14,6 +14,7 @@ import {
   updateOperationalRecord
 } from "../operational/records";
 import { queryParams, SqlQueryExecutor } from "../sql/client";
+import { parseSyntheticOrderId } from "../operational/orderMerge";
 import {
   assertOperationalReadAllowed,
   assertOperationalWriteAllowed,
@@ -177,8 +178,10 @@ export async function operationalRecordsItem(
     const actor = actorFrom(request);
     await assertOperationalWriteAllowed(collectionName, "update", actor, data, query);
     const existing = await getOperationalRecord(collectionName, id, query);
-    if (!existing) throw new OperationalNotFoundError(`Record not found: ${collectionName}/${id}`);
-    await validateOperationalWrite(collectionName, { ...existing, ...data, id }, existing, query);
+    const synthetic = collectionName === "orders" ? parseSyntheticOrderId(id) : null;
+    if (!existing && !synthetic) throw new OperationalNotFoundError(`Record not found: ${collectionName}/${id}`);
+    const validationExisting = existing || { ...(synthetic as { entity: string; orderId: string }), id };
+    await validateOperationalWrite(collectionName, { ...validationExisting, ...data, id }, validationExisting, query);
     const updated = await updateOperationalRecord(
       collectionName,
       id,

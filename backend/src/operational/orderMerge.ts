@@ -1,7 +1,7 @@
+import * as sql from "mssql";
 import { mapOrderRow, OrderSqlRow } from "../kpi/shape";
-import { OperationalRecordData, listOperationalRecords } from "./records";
 import { ERP_COLUMNS, mapErpPoStatus } from "../sync/purchaseOrderSync";
-import { queryParams, SqlQueryExecutor } from "../sql/client";
+import { queryParams, SqlQueryExecutor, typedParam } from "../sql/client";
 
 export type OrderRecord = Record<string, unknown>;
 
@@ -25,7 +25,27 @@ export interface OrderReconciliation {
   issues: OrderReconciliationIssue[];
 }
 
+export interface MergedOrderListOptions {
+  top?: number;
+  skip?: number;
+  changedSince?: Date | null;
+}
+
+interface OperationalOrderRow {
+  recordId: string;
+  dataJson: string;
+  archived: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+interface OrderMergeSqlRow extends OrderSqlRow {
+  created_at?: Date | string | null;
+  updated_at?: Date | string | null;
+}
+
 const DEFAULT_PHOENIX_ARRAY_FIELDS = ["milestones", "amendments", "claims", "receipts", "lineTracking"];
+const SYNTHETIC_ORDER_PREFIX = "erp:";
 
 export const ERP_OWNED_FIELDS = Object.freeze([
   "entity",
@@ -80,7 +100,9 @@ const erpOrderSelect = `
   last_refresh_changes_json,
   last_refresh_at,
   status AS initial_operational_status,
-  is_closed
+  is_closed,
+  created_at,
+  updated_at
 `;
 
 function text(value: unknown): string | null {
@@ -97,7 +119,18 @@ function orderKey(order: OrderRecord): string | null {
 
 function syntheticErpId(order: OrderRecord): string {
   const key = orderKey(order);
-  return key ? `erp:${key}` : `erp:${text(order.id) || "unknown"}`;
+  return key ? `${SYNTHETIC_ORDER_PREFIX}${key}` : `${SYNTHETIC_ORDER_PREFIX}${text(order.id) || "unknown"}`;
+}
+
+export function parseSyntheticOrderId(id: string): { entity: string; orderId: string } | null {
+  if (!id.startsWith(SYNTHETIC_ORDER_PREFIX)) return null;
+  const rest = id.slice(SYNTHETIC_ORDER_PREFIX.length);
+  const separator = rest.indexOf("|");
+  if (separator <= 0 || separator === rest.length - 1) return null;
+  return {
+    entity: rest.slice(0, separator),
+    orderId: rest.slice(separator + 1)
+  };
 }
 
 function phoenixArrayDefaults(): OrderRecord {
@@ -112,6 +145,24 @@ function numberOrNull(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function dateTime(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
+}
+
+function parseOperationalRow(row: OperationalOrderRow): OrderRecord {
+  const parsed = JSON.parse(row.dataJson || "{}") as OrderRecord;
+  return {
+    ...parsed,
+    id: row.recordId,
+    archived: typeof parsed.archived === "boolean" ? parsed.archived : !!row.archived,
+    createdAt: row.createdAt || parsed.createdAt,
+    updatedAt: row.updatedAt
+  };
 }
 
 function valuesDiffer(field: string, a: unknown, b: unknown): boolean {
@@ -163,17 +214,58 @@ export function stripErpOwnedFieldsForOverlay(order: OrderRecord): OrderRecord {
 }
 
 export async function readErpOrders(query: SqlQueryExecutor = queryParams): Promise<OrderRecord[]> {
-  const result = await query<OrderSqlRow>(`
+  const result = await query<OrderMergeSqlRow>(`
     SELECT ${erpOrderSelect}
       FROM dbo.orders
      ORDER BY entity, order_id;
   `);
-  return result.recordset.map(row => mapOrderRow(row));
+  return result.recordset.map(row => ({
+    ...mapOrderRow(row),
+    createdAt: dateTime(row.created_at),
+    updatedAt: dateTime(row.updated_at)
+  }));
 }
 
 export async function readOperationalOrders(query: SqlQueryExecutor = queryParams): Promise<OrderRecord[]> {
-  const rows = await listOperationalRecords("orders", query) as OperationalRecordData[];
-  return rows as OrderRecord[];
+  const result = await query<OperationalOrderRow>(`
+    SELECT
+      record_id AS recordId,
+      data_json AS dataJson,
+      archived,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM dbo.operational_records
+    WHERE collection_name = @orders_collection
+    ORDER BY updated_at DESC, record_id;
+  `, {
+    orders_collection: typedParam(sql.NVarChar(80), "orders")
+  });
+  return result.recordset.map(parseOperationalRow);
+}
+
+export async function listMergedOrders(
+  query: SqlQueryExecutor = queryParams,
+  options: MergedOrderListOptions = {}
+): Promise<OrderRecord[]> {
+  const erpOrders = await readErpOrders(query);
+  const operationalOrders = await readOperationalOrders(query);
+  let rows = mergeOrders(erpOrders, operationalOrders);
+  if (options.changedSince) {
+    const minTime = options.changedSince.getTime();
+    rows = rows.filter(row => {
+      const updatedAt = row.updatedAt ? new Date(String(row.updatedAt)).getTime() : 0;
+      return Number.isFinite(updatedAt) && updatedAt > minTime;
+    });
+  }
+  rows.sort((a, b) => {
+    const updatedA = a.updatedAt ? new Date(String(a.updatedAt)).getTime() : 0;
+    const updatedB = b.updatedAt ? new Date(String(b.updatedAt)).getTime() : 0;
+    if (updatedA !== updatedB) return updatedB - updatedA;
+    return String(a.orderId || "").localeCompare(String(b.orderId || ""));
+  });
+  const skip = options.skip || 0;
+  const top = options.top === undefined ? rows.length : options.top;
+  return rows.slice(skip, skip + top);
 }
 
 export function mergeOrders(erpOrders: OrderRecord[], operationalOrders: OrderRecord[]): OrderRecord[] {

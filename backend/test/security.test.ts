@@ -129,6 +129,60 @@ function operationalRow(collectionName: string, recordId: string, data: Record<s
   };
 }
 
+function erpOrderRow() {
+  return {
+    id: 101,
+    integration_layer: "data-warehouse",
+    entity: "Phoenix",
+    erp_source: "Navision",
+    erp_company: "PHOENIX-NAV",
+    erp_entity_id: null,
+    erp_document_id: "ERP-PO-1",
+    erp_document_no: "PO-1",
+    order_id: "PO-1",
+    erp_vendor_no: "V-1",
+    erp_vendor_name: "ERP Supplier",
+    supplier: "ERP Supplier",
+    order_type: "foreign",
+    procurement_function: "technical",
+    currency: "USD",
+    amount: 100,
+    date_of_order: "2026-07-01",
+    description: "ERP row",
+    payment_terms: "30D",
+    category: "Engineering",
+    ipr_number: null,
+    ipr_approved_date: null,
+    claimant: null,
+    requested_receipt_date: "2026-08-01",
+    erp_po_status: "Released",
+    erp_amount: 100,
+    erp_currency: "USD",
+    erp_hod_id: null,
+    erp_purchasing_mgr_id: null,
+    erp_created_from_ipr: null,
+    erp_created_by: null,
+    erp_purchaser_code: null,
+    erp_shipment_method: null,
+    lines_json: "[]",
+    warehouse_source: "fixture",
+    warehouse_record_id: "row-1",
+    warehouse_batch_id: "batch-1",
+    warehouse_extracted_at: null,
+    warehouse_loaded_at: null,
+    warehouse_hash: null,
+    erp_sync_status: "synced",
+    erp_last_synced_at: "2026-07-02T00:00:00.000Z",
+    erp_sync_error: null,
+    last_refresh_changes_json: null,
+    last_refresh_at: null,
+    initial_operational_status: "Order sent to supplier",
+    is_closed: false,
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: "2026-07-02T00:00:00.000Z"
+  };
+}
+
 function fakeReadQuery(role: string | null): SqlQueryExecutor {
   const rows = [
     operationalRow("orders", "ORDER-1", { orderId: "PO-1", supplier: "Supplier A" }),
@@ -151,7 +205,13 @@ function fakeReadQuery(role: string | null): SqlQueryExecutor {
       } as never;
     }
     if (sqlText.includes("FROM dbo.orders")) {
-      return { recordset: [{ maxUpdatedAt: "2026-07-02T00:00:00.000Z", count: 2 }] } as never;
+      if (/MAX\(updated_at\)/i.test(sqlText) || /COUNT_BIG/i.test(sqlText)) {
+        return { recordset: [{ maxUpdatedAt: "2026-07-02T00:00:00.000Z", count: 2 }] } as never;
+      }
+      return { recordset: [erpOrderRow()] } as never;
+    }
+    if (sqlText.includes("@orders_collection")) {
+      return { recordset: rows.filter(row => row.collectionName === "orders") } as never;
     }
     if (sqlText.includes("WITH ranked")) {
       return { recordset: rows } as never;

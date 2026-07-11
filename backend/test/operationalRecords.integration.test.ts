@@ -30,39 +30,39 @@ test("internal operational records CRUD supports list, stale-write guard, archiv
 }, async () => {
   try {
     await cleanup();
-    const created = await createOperationalRecord("orders", {
-      id: `${prefix}ORDER-1`,
+    const created = await createOperationalRecord("shipments", {
+      id: `${prefix}SHIP-1`,
       entity: "Phoenix",
       orderId: "FPO-API-1",
-      supplier: "Internal Supplier",
-      amount: 100
+      shipmentId: "FPO-API-1 (S1)",
+      supplier: "Internal Supplier"
     }, "TEST");
 
-    assert.equal(created.id, `${prefix}ORDER-1`);
+    assert.equal(created.id, `${prefix}SHIP-1`);
     const grouped = await listOperationalRecords(undefined) as Record<string, OperationalRecordData[]>;
-    const listed = grouped.orders.find(row => row.id === `${prefix}ORDER-1`);
+    const listed = grouped.shipments.find(row => row.id === `${prefix}SHIP-1`);
     assert.ok(listed);
     assert.equal(listed.supplier, "Internal Supplier");
     assert.ok(listed.updatedAt);
 
     await assert.rejects(
-      () => updateOperationalRecord("orders", `${prefix}ORDER-1`, { supplier: "Too late" }, "TEST", "2000-01-01T00:00:00.000Z"),
+      () => updateOperationalRecord("shipments", `${prefix}SHIP-1`, { supplier: "Too late" }, "TEST", "2000-01-01T00:00:00.000Z"),
       OperationalStaleWriteError
     );
 
-    const updated = await updateOperationalRecord("orders", `${prefix}ORDER-1`, {
+    const updated = await updateOperationalRecord("shipments", `${prefix}SHIP-1`, {
       supplier: "Updated Supplier",
-      amount: 125
+      shipmentId: "FPO-API-1 (S1A)"
     }, "TEST");
     assert.equal(updated.supplier, "Updated Supplier");
-    assert.equal(updated.amount, 125);
+    assert.equal(updated.shipmentId, "FPO-API-1 (S1A)");
 
-    const archived = await archiveOperationalRecord("orders", `${prefix}ORDER-1`, "test archive", "TEST");
+    const archived = await archiveOperationalRecord("shipments", `${prefix}SHIP-1`, "test archive", "TEST");
     assert.equal(archived.archived, true);
     assert.equal(archived.archiveReason, "test archive");
     assert.equal(archived.archivedBy, "TEST");
 
-    const restored = await restoreOperationalRecord("orders", `${prefix}ORDER-1`, "TEST");
+    const restored = await restoreOperationalRecord("shipments", `${prefix}SHIP-1`, "TEST");
     assert.equal(restored.archived, false);
     assert.equal(restored.archiveReason, null);
 

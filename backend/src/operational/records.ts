@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import * as sql from "mssql";
 import { queryParams, SqlQueryExecutor, typedParam } from "../sql/client";
+import {
+  listMergedOrders,
+  mergeOrders,
+  parseSyntheticOrderId,
+  readErpOrders,
+  stripErpOwnedFieldsForOverlay
+} from "./orderMerge";
 
 export class OperationalBadRequestError extends Error {}
 export class OperationalNotFoundError extends Error {}
@@ -112,16 +119,15 @@ function parseTop(value: unknown, fallback?: number): number | undefined {
 }
 
 function changedSinceParam(value: unknown): ReturnType<typeof typedParam> | null {
+  const date = changedSinceDate(value);
+  return date ? typedParam(sql.DateTime2(3), date) : null;
+}
+
+function changedSinceDate(value: unknown): Date | null {
   if (value === undefined || value === null || value === "") return null;
   const date = value instanceof Date ? value : new Date(String(value));
   if (Number.isNaN(date.getTime())) throw new OperationalBadRequestError("changedSince must be a valid date/time.");
-  return typedParam(sql.DateTime2(3), date);
-}
-
-function latestDate(a: Date | string | null, b: Date | string | null): Date | string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+  return date;
 }
 
 async function findRow(
@@ -166,6 +172,15 @@ export async function listOperationalRecords(
   const params: Record<string, unknown> = {};
   if (collectionName) {
     const collection = assertOperationalCollection(collectionName);
+    const skip = parseNonNegativeInt(options.skip, "skip", 0) || 0;
+    const top = parseTop(options.top, collection === "status_log" ? STATUS_LOG_CAP : undefined);
+    if (collection === "orders") {
+      return listMergedOrders(query, {
+        skip,
+        top,
+        changedSince: changedSinceDate(options.changedSince)
+      }) as Promise<OperationalRecordData[]>;
+    }
     const clauses = ["collection_name = @collection_name"];
     params.collection_name = collectionParam(collection);
     const changedSince = changedSinceParam(options.changedSince);
@@ -173,8 +188,6 @@ export async function listOperationalRecords(
       clauses.push("updated_at > @changed_since");
       params.changed_since = changedSince;
     }
-    const skip = parseNonNegativeInt(options.skip, "skip", 0) || 0;
-    const top = parseTop(options.top, collection === "status_log" ? STATUS_LOG_CAP : undefined);
     let pagination = "";
     if (top !== undefined || skip > 0) {
       params.skip = typedParam(sql.Int, skip);
@@ -235,6 +248,7 @@ export async function listOperationalRecords(
     const bucket = grouped[row.collectionName] || (grouped[row.collectionName] = []);
     bucket.push(parseData(row));
   }
+  grouped.orders = mergeOrders(await readErpOrders(query), grouped.orders);
   return grouped;
 }
 
@@ -264,19 +278,38 @@ export async function listOperationalRecordHeads(
     };
   }
 
-  const erpOrders = await query<{ maxUpdatedAt: Date | string | null; count: number }>(`
-    SELECT
-      MAX(updated_at) AS maxUpdatedAt,
-      COUNT_BIG(*) AS count
-    FROM dbo.orders;
-  `);
-  const erpHead = erpOrders.recordset[0];
-  if (erpHead) {
-    const current = heads.orders;
+  const mergedOrders = await query<{ maxUpdatedAt: Date | string | null; count: number }>(`
+    WITH order_keys AS (
+      SELECT
+        CONCAT(entity, N'|', order_id) AS mergeKey,
+        updated_at AS updatedAt
+      FROM dbo.orders
+      WHERE entity IS NOT NULL AND order_id IS NOT NULL
+      UNION ALL
+      SELECT
+        CONCAT(COALESCE(entity, JSON_VALUE(data_json, '$.entity')), N'|', JSON_VALUE(data_json, '$.orderId')) AS mergeKey,
+        updated_at AS updatedAt
+      FROM dbo.operational_records
+      WHERE collection_name = @orders_collection
+        AND COALESCE(entity, JSON_VALUE(data_json, '$.entity')) IS NOT NULL
+        AND JSON_VALUE(data_json, '$.orderId') IS NOT NULL
+    ),
+    merged AS (
+      SELECT mergeKey, MAX(updatedAt) AS maxUpdatedAt
+      FROM order_keys
+      GROUP BY mergeKey
+    )
+    SELECT MAX(maxUpdatedAt) AS maxUpdatedAt, COUNT_BIG(*) AS count
+    FROM merged;
+  `, {
+    orders_collection: collectionParam("orders")
+  });
+  const mergedOrderHead = mergedOrders.recordset[0];
+  if (mergedOrderHead) {
     heads.orders = {
       collectionName: "orders",
-      maxUpdatedAt: latestDate(current.maxUpdatedAt, erpHead.maxUpdatedAt),
-      count: Math.max(Number(current.count || 0), Number(erpHead.count || 0))
+      maxUpdatedAt: mergedOrderHead.maxUpdatedAt,
+      count: Number(mergedOrderHead.count || 0)
     };
   }
 
@@ -292,13 +325,14 @@ export async function createOperationalRecord(
   const collection = assertOperationalCollection(collectionName);
   const id = typeof data.id === "string" && data.id.trim() ? data.id.trim() : randomUUID();
   const timestamp = nowIso();
+  const cleanData = collection === "orders" ? stripErpOwnedFieldsForOverlay(data) : data;
   const payload = dataForWrite({
-    ...data,
+    ...cleanData,
     id,
-    createdAt: data.createdAt || timestamp,
-    createdBy: data.createdBy || actor,
-    updatedAt: data.updatedAt || timestamp,
-    updatedBy: data.updatedBy || actor
+    createdAt: cleanData.createdAt || timestamp,
+    createdBy: cleanData.createdBy || actor,
+    updatedAt: cleanData.updatedAt || timestamp,
+    updatedBy: cleanData.updatedBy || actor
   }, id);
   await query(`
     INSERT INTO dbo.operational_records (
@@ -327,7 +361,13 @@ export async function updateOperationalRecord(
 ): Promise<OperationalRecordData> {
   const collection = assertOperationalCollection(collectionName);
   const row = await findRow(collection, id, query);
-  if (!row) throw new OperationalNotFoundError(`Record not found: ${collection}/${id}`);
+  if (!row) {
+    const synthetic = collection === "orders" ? parseSyntheticOrderId(id) : null;
+    if (synthetic) {
+      return createOperationalRecord(collection, { ...patch, ...synthetic, id }, actor, query);
+    }
+    throw new OperationalNotFoundError(`Record not found: ${collection}/${id}`);
+  }
   if (expectedUpdatedAt) {
     const live = new Date(row.updatedAt).getTime();
     const expected = new Date(String(expectedUpdatedAt)).getTime();
@@ -337,12 +377,13 @@ export async function updateOperationalRecord(
   }
   const existing = parseData(row);
   const timestamp = nowIso();
+  const cleanPatch = collection === "orders" ? stripErpOwnedFieldsForOverlay(patch) : patch;
   const merged = dataForWrite({
     ...existing,
-    ...patch,
+    ...cleanPatch,
     id,
-    updatedAt: patch.updatedAt || timestamp,
-    updatedBy: patch.updatedBy || actor
+    updatedAt: cleanPatch.updatedAt || timestamp,
+    updatedBy: cleanPatch.updatedBy || actor
   }, id);
   await query(`
     UPDATE dbo.operational_records

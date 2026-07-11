@@ -58,12 +58,14 @@ async function loadCollection(
   }));
 }
 
-function validateOrder(data: RecordData): string[] {
+function validateOrder(data: RecordData, existing: RecordData | null): string[] {
   const errors: string[] = [];
   if (!String(data.orderId || "").trim()) errors.push("Order number is required.");
   if (!String(data.entity || "").trim()) errors.push("Entity is required.");
-  if (!String(data.supplier || "").trim() || String(data.supplier || "").trim() === "-") errors.push("Supplier is required.");
-  if (!String(data.currency || "").trim()) errors.push("Currency is required.");
+  if (!existing && (!String(data.supplier || "").trim() || String(data.supplier || "").trim() === "-")) errors.push("Supplier is required.");
+  if (!existing && !String(data.currency || "").trim()) errors.push("Currency is required.");
+  if (existing && Object.prototype.hasOwnProperty.call(data, "supplier") && (!String(data.supplier || "").trim() || String(data.supplier || "").trim() === "-")) errors.push("Supplier is required.");
+  if (existing && Object.prototype.hasOwnProperty.call(data, "currency") && !String(data.currency || "").trim()) errors.push("Currency is required.");
   if (data.amount !== undefined && data.amount !== null && data.amount !== "" && !isNum(data.amount)) {
     errors.push("Order amount must be a number.");
   }
@@ -111,7 +113,7 @@ export async function validateOperationalWrite(
   query: SqlQueryExecutor = queryParams
 ): Promise<void> {
   let errors: string[] = [];
-  if (collectionName === "orders") errors = validateOrder(data);
+  if (collectionName === "orders") errors = validateOrder(data, existing);
   else if (collectionName === "payment_requests") errors = await validatePayment(data, existing, query);
   else if (collectionName === "documents") errors = validateDocument(data);
   if (errors.length) throw new BackendValidationError(errors);
