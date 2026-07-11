@@ -181,6 +181,12 @@ Backend v1 scaffold:
 - `backend/src/operational/records.ts` implements the operational record allowlist,
   JSON record mapping, capped `status_log` reads, per-collection change heads,
   soft archive/restore, and stale-write guard over SQL Server.
+- `backend/src/operational/orderMerge.ts` is the R1 design-spike for merging SQL
+  ERP orders with Phoenix operational overlays. It derives ERP-owned fields from
+  the connector field list, keeps Phoenix-owned overlay fields, can strip
+  ERP-owned values before future overlay writes, and can report ERP-only,
+  app-only, and value-mismatch reconciliation issues. This helper is tested but
+  is not yet wired into the live `/api/records` order read/write path.
 - `backend/src/operational/counters.ts` validates counter keys and increments
   `dbo.app_counters` with parameterized SQL.
 - `backend/src/security/permissions.ts` mirrors the browser `REF.permissions`

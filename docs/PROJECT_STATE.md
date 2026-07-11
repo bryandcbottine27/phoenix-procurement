@@ -177,6 +177,7 @@ Authentication and access:
 - Backend cycle-time analytics are order-only. True workflow time-in-stage, stage-transition bottlenecks, and officer stage-SLA analytics require migration of browser `status_log` / workflow transition history into SQL.
 - Backend OTIF early warning is an order-only proxy. Supplier historical delay, supplier promise revision counts, shipment stage, GRN outcome, and true OTIF prediction require additional datasets or approved browser-side `PXProcFollowup` work.
 - Backend unclassified/unmapped worklist support is read-only. A browser-side Exception Workbench now surfaces Firestore import/classification/supplier-mapping exceptions and links to existing remediation screens, but one-click backend add-rule/map-supplier/resolve-currency actions still require final write-design decisions.
+- R1 order-store merge is at design-spike stage only. `backend/src/operational/orderMerge.ts` and its tests now prove the merge rules for SQL ERP orders plus Phoenix operational overlays, including ERP-only/app-only reconciliation and ERP-owned-field precedence. The live `/api/records` order read/write path has not yet been wired to this merge helper.
 - Large generated single HTML is expected. Do not edit it by hand.
 - Some older docs may describe prototype history; the new continuity docs should be treated as the primary handover map.
 

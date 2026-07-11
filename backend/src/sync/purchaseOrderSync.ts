@@ -5,7 +5,7 @@ import { OrderContractField, PurchaseOrderContract } from "../warehouse/contract
 
 type OrderRecord = Record<string, unknown>;
 
-interface FieldColumn {
+export interface FieldColumn {
   field: OrderContractField;
   column: string;
   param: string;
@@ -43,7 +43,7 @@ const allowedEntities = new Set(["Phoenix", "Seychelles Breweries", "Edena"]);
 const allowedFunctions = new Set(["technical", "indirect", "supplychain"]);
 const allowedOrderTypes = new Set(["foreign", "local"]);
 
-const ERP_COLUMNS: FieldColumn[] = [
+export const ERP_COLUMNS: FieldColumn[] = [
   { field: "erpSource", column: "erp_source", param: "erp_source" },
   { field: "erpCompany", column: "erp_company", param: "erp_company" },
   { field: "erpEntityId", column: "erp_entity_id", param: "erp_entity_id" },
