@@ -76,6 +76,10 @@ Current migrations create:
 - `dbo.operational_records`
 - `dbo.app_counters`
 
+Current migrations also add read/support indexes through
+`backend/db/006_order_merge_indexes.sql`, including the merged order read/head
+path used by the API-mode browser.
+
 Use least-privilege SQL principals:
 
 - write principal for sync and operational record routes;
@@ -151,6 +155,7 @@ The real Data Warehouse feed is not connected yet. Until IT provides the final w
 - [ ] Only the two approved package zips exist in the project root.
 - [ ] `python build.py` passes.
 - [ ] `backend pnpm test` passes; SQL integration passes where SQL Server is available.
+- [ ] `backend pnpm test` with `RUN_SQL_INTEGRATION=true` passes against the target-like SQL test database, including the sync-to-records E2E flow.
 - [ ] SQL migrations have been applied to the target database.
 - [ ] `/api/health` returns SQL healthy.
 - [ ] `/api/records` returns a grouped payload.

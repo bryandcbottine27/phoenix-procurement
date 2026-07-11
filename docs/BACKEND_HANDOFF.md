@@ -364,3 +364,33 @@ Backend-safe handoff status:
 - 3b.1 through F5 are implemented and tested in the backend/API path.
 - Deferred browser-specific items: `src/procurementFollowup.js` predictive
   enhancement and the admin worklist UI/write actions.
+
+## 9. Complete Backend Handoff A-E Status
+
+Current status after the closed-environment backend pass:
+
+- Stage A is wired. API-mode order reads merge SQL ERP rows from `dbo.orders`
+  with active Phoenix order overlays from `dbo.operational_records`; order
+  overlay writes strip ERP-owned fields before storing; synthetic ERP-only ids
+  create the first Phoenix overlay when an ERP-sourced order is edited; and
+  `GET /api/reconciliation/orders` is available for admin/manager review.
+- Orders are intentionally exempt from `top`, `skip`, and `changedSince`
+  collection slicing. The browser uses `/api/records/heads` to detect order
+  changes, then refreshes the full merged order set so the two-source merge
+  cannot produce partial or misleading browser state.
+- Stage B is complete locally. Migrations now run through
+  `backend/db/006_order_merge_indexes.sql`, including `dbo.app_counters` and
+  merged-order support indexes, and have been applied twice idempotently against
+  Docker SQL Server.
+- Stage C is already represented by `tools/package.py`: the production package
+  stages `demoMode:false`, `authMode:'internal'`, and `dataMode:'api'` with
+  same-origin `/api` defaults and no committed secrets.
+- Stage D has local SQL integration coverage. `backend/test/e2eOperationalFlow.integration.test.ts`
+  proves the critical path: fixture/contract sync inserts an ERP order, the
+  operational records API returns it merged, an API overlay update preserves ERP
+  truth while adding Phoenix fields, and reconciliation has no issue for that
+  order.
+- Stage E remains an IT deployment activity: provision the target SQL Server,
+  run migrations, deploy Functions/app settings, host the production HTML over
+  internal HTTPS, provide final identity/API policy, and run the go-live
+  smoke checklist in `docs/GO_LIVE_RUNBOOK.md`.

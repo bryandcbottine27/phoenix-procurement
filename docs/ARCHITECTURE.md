@@ -158,6 +158,9 @@ Backend v1 scaffold:
   system configuration.
 - `backend/db/005_app_counters.sql` adds SQL-backed generated-reference counters
   used by API mode, starting with RFP numbering.
+- `backend/db/006_order_merge_indexes.sql` adds idempotent support indexes for
+  merged order reads and order-head polling across ERP orders and active Phoenix
+  order overlays.
 - SQL `orders` has a unique `(entity, order_id)` constraint to protect idempotent sync.
 - Phoenix-owned operational state is represented separately from ERP/provenance columns so the sync upsert can preserve it.
 - `backend/src/sources/dwSource.ts` reads fixture purchase orders, normalises them to the `PXWarehouse.ORDER_CONTRACT_FIELDS` shape, and applies backend classification.
@@ -180,13 +183,18 @@ Backend v1 scaffold:
   counters for generated references in internal browser API mode.
 - `backend/src/operational/records.ts` implements the operational record allowlist,
   JSON record mapping, capped `status_log` reads, per-collection change heads,
-  soft archive/restore, and stale-write guard over SQL Server.
+  soft archive/restore, and stale-write guard over SQL Server. Non-order
+  collection reads support `top`/`skip`/`changedSince`; `orders` reads return the
+  full merged set because they are derived from both ERP SQL rows and Phoenix
+  overlays.
 - `backend/src/operational/orderMerge.ts` merges SQL ERP orders with Phoenix
   operational overlays for API-mode `/api/records` order reads. It derives
   ERP-owned fields from the connector field list, keeps Phoenix-owned overlay
   fields, strips ERP-owned values before order overlay writes, supports
   synthetic ERP-only order ids when the browser first edits an ERP-sourced order,
-  and reports ERP-only, app-only, and value-mismatch reconciliation issues.
+  and reports ERP-only, app-only, and value-mismatch reconciliation issues. It
+  reads active operational order overlays directly from `dbo.operational_records`
+  to avoid recursive calls through the merge-wrapped operational record API.
 - `backend/src/operational/counters.ts` validates counter keys and increments
   `dbo.app_counters` with parameterized SQL.
 - `backend/src/security/permissions.ts` mirrors the browser `REF.permissions`

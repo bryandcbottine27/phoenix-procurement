@@ -150,7 +150,7 @@ the full operational store. Normal browser writes still go through `PXStore`, th
 
 - `GET /api/records`
 - `GET /api/records/heads`
-- `GET /api/records/{collection}?top=&skip=&changedSince=`
+- `GET /api/records/{collection}?top=&skip=&changedSince=` (non-order collections)
 - `POST /api/records/{collection}`
 - `PATCH /api/records/{collection}/{id}`
 - `POST /api/records/{collection}/{id}/archive`
@@ -161,21 +161,24 @@ the full operational store. Normal browser writes still go through `PXStore`, th
 Allowed collections are hard-coded in `src/operational/records.ts` and mirror the
 browser business collections. Records are stored in `dbo.operational_records` as
 allowlisted collection/name pairs with JSON payload, SQL timestamps, soft archive
-flags, and a stale-write guard based on `updated_at`. Single-collection reads
-support `top`, `skip`, and `changedSince`; `status_log` is capped to the latest
-200 rows by default so routine API polling cannot drag the full audit history into
-the browser.
+flags, and a stale-write guard based on `updated_at`. Non-order single-collection
+reads support `top`, `skip`, and `changedSince`; `status_log` is capped to the
+latest 200 rows by default so routine API polling cannot drag the full audit
+history into the browser.
 
 Orders are merged on read. `GET /api/records` and `GET /api/records/orders`
 combine ERP-owned SQL rows from `dbo.orders` with Phoenix-owned overlays from
 `dbo.operational_records`. ERP-owned fields such as supplier, amount, currency,
 ERP lifecycle status, provenance, and classified `function`/`orderType` win from
 `dbo.orders`; Phoenix-owned fields such as operational `status`, milestones,
-notes, claims, receipts, and archive flags stay in the overlay. If an ERP-only
+notes, claims, and receipts stay in the active overlay. If an ERP-only
 order is edited for the first time, the synthetic id returned by the merged read
 creates a Phoenix overlay record. Order overlay writes strip ERP-owned fields
 before storing, keeping only the merge keys (`entity`, `orderId`) plus
-Phoenix-owned fields.
+Phoenix-owned fields. Because the order collection is derived from two stores,
+`GET /api/records/orders` intentionally returns the full merged set and ignores
+`top`, `skip`, and `changedSince`; `/api/records/heads` is the change detector
+that tells the browser when to refresh orders.
 
 Read routes require `x-phoenix-user` to resolve to an active stored officer in
 `dbo.operational_records`. `GET /api/records` and `GET /api/records/heads` return
@@ -414,6 +417,10 @@ record table.
 
 `db/005_app_counters.sql` adds SQL-backed counters used for API-mode generated
 references such as RFP numbers.
+
+`db/006_order_merge_indexes.sql` adds idempotent support indexes for the merged
+order read/head path over `dbo.orders` and active order overlays in
+`dbo.operational_records`.
 
 ## Order Alert Notifications
 
