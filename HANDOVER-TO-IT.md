@@ -1,137 +1,104 @@
-# Phoenix Procurement — IT Handover Package
+# Phoenix Procurement - IT Handover Package
 
 **Prepared for:** Phoenix Beverages IT / Infrastructure team
-**Application:** Phoenix Procurement — a procurement "control tower" layered over the ERP
-(Navision → Business Central), covering Phoenix, Seychelles Breweries, and Edena.
-**Contents of this package:** the production application, full source, and all documentation
-needed to deploy it.
+**Application:** Phoenix Procurement - procurement, logistics, finance follow-up, and management control tower for Phoenix, Seychelles Breweries, and Edena.
+**Deployment posture:** internal SQL/API mode by default; Firebase is retained for demo only unless IT explicitly reselects it.
 
----
+## 1. Read This First
 
-## 1. Read this first — what you are receiving, in one paragraph
+Phoenix Procurement is a control layer over ERP data from Navision / Business Central. It is not a replacement ERP.
 
-This is a complete, working web application backed by Google Firebase / Firestore. The business
-logic, the full feature set, and a 10-role access-control model are finished and verified. **It is not,
-however, a "drop it on a server and forget it" deliverable** — going live safely requires you to point
-it at your own Firebase project, apply database security rules, decide on an authentication method, and
-prepare the data. Those steps are spelled out in `docs/GO_LIVE_RUNBOOK.md`. Please complete that runbook
-before opening the app to real users. The most important single step is applying the **Firestore
-security rules** — without them, the database has no server-side protection.
+The current production package is staged for a private/internal server deployment:
 
----
+- browser app: `demoMode: false`, `authMode: 'internal'`, `dataMode: 'api'`;
+- backend: Azure Functions v4, Node/TypeScript, SQL Server via `mssql`;
+- database: SQL Server migrations under `backend/db/`;
+- Firebase: demo path only, not the default production path.
 
-## 2. What's in this package
+Do not follow older Firebase-first instructions if they appear in archived material. The current deployment checklist is `docs/GO_LIVE_RUNBOOK.md`.
 
+## 2. Package Files
+
+The project root must contain exactly two package zips:
+
+- `Phoenix Procurement DEMO FULL.zip`
+- `Phoenix Procurement PRODUCTION FULL.zip`
+
+Both are full snapshots and intentionally include source, docs, tools, and backend source. They exclude `node_modules`, generated backend `dist`, `.git`, local settings, and secret/key files.
+
+Use the production package for internal server testing and pilot preparation. Use the demo package only for demo/Firebase testing.
+
+## 3. What IT Must Provide Before Pilot
+
+1. **SQL Server database**
+   - Apply `backend/db/001_init.sql` through the latest migration.
+   - Current latest migration is `backend/db/005_app_counters.sql`.
+   - Use trusted certificates and least-privilege SQL principals for production.
+
+2. **Backend hosting**
+   - Host the Azure Functions backend under `backend/`.
+   - Required app settings include `FUNCTIONS_WORKER_RUNTIME=node`, `SQL_CONNECTION_STRING`, and `AzureWebJobsStorage`.
+   - Graph notification settings remain disabled unless IT provides the approved app registration and secrets.
+
+3. **Static browser hosting**
+   - Host `dist/phoenix-procurement-PRODUCTION.html` from the production zip over HTTPS.
+   - Same-origin hosting is recommended so `apiBaseUrl: '/api'` works unchanged.
+   - If API is on another internal URL, update `APP_CONFIG.apiBaseUrl` during deployment.
+
+4. **Identity and authorization**
+   - The current `authMode: 'internal'` setup is suitable for closed-environment testing only.
+   - Before pilot/go-live, IT must enforce individual identity and server-side authorization through Entra ID/SSO, Windows-integrated auth, APIM/reverse-proxy policy, or another approved gateway.
+   - Browser role checks are not enough on their own.
+
+5. **Data and integration**
+   - Seed officers/roles, suppliers, working calendars, import rules, and entity reference data.
+   - The real Data Warehouse feed is not connected yet. Until IT provides the final source view/API, use the controlled Excel import or fixture-backed backend sync for testing.
+
+## 4. Backend Smoke Checks
+
+From `backend/`:
+
+```powershell
+pnpm install
+$env:SQL_CONNECTION_STRING='<approved SQL connection string>'
+pnpm run db:migrate
+pnpm test
+pnpm start
 ```
-phoenix-procurement-PRODUCTION.html   ← the built production app (single file)
-src/                                   ← full modular source (58 modules)
-index.html, build.py, styles/, tools/  ← build system (rebuild with: python build.py)
-docs/
-  GO_LIVE_RUNBOOK.md                   ← ★ your deployment checklist — start here
-  FIRESTORE_RULES/                     ← ★ two security-rule templates (mandatory)
-  PHOENIX_DEVELOPER_NOTES.md           ← architecture & every feature, for maintainers
-  DATA_DICTIONARY.md                   ← the data model (auto-generated)
-  PILOT_TEST_PACK.md                   ← test scenarios incl. role-based access
-  PHOENIX_ACCESS_GRID.xlsx             ← the approved per-role access matrix
-  (plus supporting specs)
+
+Then check:
+
+```powershell
+Invoke-RestMethod http://localhost:7071/api/health
+Invoke-RestMethod -Headers @{ "x-functions-key" = "<function-key>" } http://localhost:7071/api/records
+Invoke-RestMethod -Method Post -Headers @{ "x-functions-key" = "<function-key>" } http://localhost:7071/api/counters/smoke:counter/next
 ```
 
-The app is also available built and ready-to-open at
-`dist/phoenix-procurement-PRODUCTION.html`.
+`func start` runs timer infrastructure too. Provide reachable `AzureWebJobsStorage` or Azurite for a clean local host run; otherwise HTTP endpoints may work while timer/storage health warnings appear.
 
----
+## 5. Current Verification State
 
-## 3. The four things IT must do before go-live (summary — full detail in the runbook)
+The current branch has been validated locally with:
 
-1. **Stand up a production Firebase project.** Do not reuse any prototype project for live data.
-   Put its config into the `APP_CONFIG` block at the top of `src/core.js`, then rebuild.
-2. **Apply the Firestore security rules** (`docs/FIRESTORE_RULES/`). This is the real, server-side
-   access control. The app's in-browser role checks are necessary for a correct UI but can be bypassed;
-   the database rules are what actually protect the data. **No rules = not safe to go live.**
-3. **Decide and wire authentication.** Either Azure AD / M365 single sign-on (recommended — gives true
-   per-person access), or an interim internal-network-only launch. The app supports both; the runbook
-   covers each.
-4. **Prepare the data.** Use a clean (empty) production database, seed officers with their roles, import
-   the 2024→today order history, then run KPI Trends → "Backfill history" once.
+- root `python build.py`;
+- package zip hygiene invariants;
+- backend TypeScript build and `node:test`;
+- backend SQL integration against Docker SQL Server;
+- local Functions HTTP smoke for `/api/health`, `/api/records`, and `/api/counters/{counterKey}/next`.
 
-A full pre-go-live verification checklist is at the end of the runbook.
+See `docs/PROJECT_STATE.md` and `backend/README.md` for the latest detailed state.
 
----
+## 6. Main Documents
 
-## 4. About the access control (so IT understands what's already built)
+- `docs/GO_LIVE_RUNBOOK.md` - internal deployment and hardening checklist.
+- `backend/README.md` - backend setup, migrations, endpoints, and local test steps.
+- `docs/ARCHITECTURE.md` - browser/backend architecture.
+- `docs/BUSINESS_RULES.md` and `docs/DECISIONS.md` - rules that should not be reversed casually.
+- `docs/DATA_DICTIONARY.md` - generated field and collection dictionary.
+- `docs/PHOENIX_DEVELOPER_NOTES.md` - detailed maintainer notes.
 
-The application enforces a **10-role model** in its interface — Senior Procurement Manager,
-Procurement/SC Manager / Supervisor / Officer, Logistics Manager / Officer, Demand Planning Supervisor /
-Officer, Finance, and Internal Stakeholder, plus an Admin (IT) role. Each role's screen visibility and
-allowed actions were defined by the business and are documented in `docs/PHOENIX_ACCESS_GRID.xlsx`.
-Every create / edit / delete / approve action is permission-gated in the code.
+## 7. Firebase Note
 
-**Important:** this is the *application layer*. It produces the correct experience per role, but a
-determined user could bypass browser-side checks. The **Firestore security rules** (step 2 above) are
-what enforce these same boundaries on the server. Both layers should agree; the rule templates are a
-starting point that IT must review and adapt to the final identity model.
+Firebase/Firestore remains available for the demo build and as an optional future path only if IT explicitly reselects it. If that happens, the deployment docs and package settings must be updated together, and Firestore security rules must be reviewed and deployed before any live use.
 
-The production build (`demoMode: false`) additionally disables the demo-only role switcher and fails
-"closed" — an unknown role or an unlisted action is denied rather than allowed.
-
----
-
-## 5. What is explicitly out of scope (so there are no surprises)
-
-- **Live ERP integration.** The app ingests ERP data by Excel import, not a live Navision/Business
-  Central sync. A live integration is a separate future project.
-- **The authentication implementation itself** (Azure AD wiring) is IT's to complete — the app is built
-  to accept it.
-- **Ongoing role administration** (assigning people to roles) is a business/admin task, done in-app.
-
----
-
-## 6. Who built what / how to maintain
-
-The app is a single-file build assembled from modular source by `build.py` (which also runs a syntax
-gate and 13 structural invariant checks). To change anything: edit `src/`, run `python build.py`, and
-ship the regenerated `dist/` file. Architecture and conventions are in
-`docs/PHOENIX_DEVELOPER_NOTES.md`.
-
----
-
-*If anything in the runbook is unclear, the developer notes and the data dictionary together describe
-the system in full. The safest sequence is: read this page → work through `GO_LIVE_RUNBOOK.md` →
-verify against its checklist → then open to users.*
-
----
-
-## Review updates (this build)
-
-### Which demo file to open
-`dist/phoenix-procurement-DEMO.html` is the single generated demo file — open this. (The former
-`phoenix-procurement-no-login.html` and `phoenix-procurement-BC-STRUCTURE-DEMO.html` were
-byte-identical duplicates and have been removed to avoid testing a stale copy.) The Business
-Central UI is ON by default — there is no separate BC build.
-
-### BC Card Page — scope (P4)
-The full-page **Business Central card page** (Back link + action ribbon + tabbed content + FactBox rail)
-currently applies to **ORDERS only**. Opening an order replaces the list with its card; the **Back**
-button returns to the exact operational view you came from (Dashboard, My Work, Foreign/Local Orders,
-Reports/Controls, Exceptions, etc.).
-
-**Shipment and Payment-Request details remain modal-based — this is intentional for now.** Extending
-the card-page pattern to Shipments and Payment Requests is a planned, separate increment; it was kept
-out of this build to avoid destabilising those flows. The card page is behind `APP_CONFIG.bcCardPage`
-(default true) and `APP_CONFIG.bcStructure`; setting either false reverts orders to modal behaviour.
-
-### Empty BC menu groups (P2)
-BC top-menu groups now hide automatically when a role has no visible items inside them. This runs after
-role switch, entity switch, page refresh, and any re-render, across all three entities.
-
-### Login model (segregation of duties)
-Each user must use their own username/password or SSO account. Shared departmental logins and the former
-"Who's working?" picker are no longer part of the active build. Access is resolved from the authenticated
-user's officer profile (`officers/{auth uid}`, `authUid`, or `email`), so My Work, approvals and audit
-trails remain tied to the real person. IT must provision one account per user and ensure the matching
-Officer record has the correct role, function, email/Auth UID and active status.
-
-### Demo Firestore behaviour (P5)
-Subscriptions for `updateRequests`, `contactLog`, `kpiSnapshot`, and `exports` fail gracefully in the
-demo (empty or restricted collections log a calm `[demo] … continuing.` info message, not an error).
-Their state arrays are pre-initialised, so no view breaks when a collection is empty or read-restricted.
+Do not mix Firebase and SQL/API production paths casually. Choose one production architecture and keep the configuration, docs, identity model, and security controls aligned.
